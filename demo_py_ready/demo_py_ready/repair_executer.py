@@ -128,7 +128,7 @@ def grindSurface(ur_control, acc, vel,  numPasses, points):
 class URControlNode(Node):
     def __init__(self):
         super().__init__('ur_control_node')
-        self.subscription = self.create_subscription(PoseArray, 'repair_area_corners', self.pose_array_callback, 10)
+        self.subscription = self.create_subscription(PoseArray, 'repair_area', self.pose_array_callback, 10)
         self.marker_publisher = self.create_publisher(Marker,'repair_path', 10)
         self.points_list = []
         self.robot_ip = "172.16.3.114"  # Replace with your robot's IP address

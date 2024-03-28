@@ -11,10 +11,6 @@ import tf2_geometry_msgs
 
 import open3d as o3d
 
-
-from geometry_msgs.msg import Pose
-from geometry_msgs.msg import PoseArray
-
 g_voxel_size = 0.01 # downsample pointcloud
 
 def vector(x,y,z):
@@ -118,9 +114,9 @@ def omit_far_points(max_distance, pcd):
 
 class PlaneFinder(Node):
     def __init__(self):
-        super().__init__('plane_finder')
+        super().__init__('surface_detection')
         self.subscription = self.create_subscription(PointCloud2, '/camera/camera/depth/color/points', self.camera_callback, 10)
-        self.publisher_ = self.create_publisher(PoseArray, 'repair_detected_surfaces', 10)
+        self.publisher_ = self.create_publisher(PoseArray, 'detected_surfaces', 10)
         self.command_subscriber = self.create_subscription(String, 'repair_command', self.command_callback, 10)
         # Transofrms
         self.tf_buffer = tf2_ros.Buffer()

@@ -248,6 +248,7 @@ def grindSurface(robot, acc, vel, numPasses, grinder):
 
 
 class URControlNode(Node):
+    #grind angle surface 
     def __init__(self):
         super().__init__("ur_grind_action")
         self.subscription = self.create_subscription(

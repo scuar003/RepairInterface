@@ -8,13 +8,20 @@
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include "interactive_markers/interactive_marker_server.hpp"
+#include <interactive_markers/menu_handler.hpp>
 #include "visualization_msgs/msg/interactive_marker.hpp"
 #include "visualization_msgs/msg/interactive_marker_control.hpp"
 #include "visualization_msgs/msg/interactive_marker_feedback.hpp"
 #include <geometry_msgs/msg/point.hpp>
 
+using namespace std::placeholders; // For _1 in std::bind
 using Marker = visualization_msgs::msg::Marker;
 using Vector = Eigen::Vector3d;
+using Menu = interactive_markers::MenuHandler;
+using IntControl = visualization_msgs::msg::InteractiveMarkerControl;
+using IntMarker = visualization_msgs::msg::InteractiveMarker;
+
+
 
 Vector pose2vector(const geometry_msgs::msg::Pose &pose)
 {
@@ -115,10 +122,11 @@ public:
     RepairInterface() : Node("repair_interface") {}
 
     void init() {
-        poses_subscriber_ = create_subscription<geometry_msgs::msg::PoseArray>("repair_detected_surfaces", 10, std::bind(&RepairInterface::detectSurfacesCallback, this, std::placeholders::_1));
-        renderer_publisher_ = create_publisher<Marker>("repair_plane_marker", 10);
-        selector_publisher_ = create_publisher<geometry_msgs::msg::PoseArray>("repair_area", 10);
-        selector_server_ = std::make_unique<interactive_markers::InteractiveMarkerServer>("repair_desired_plane", shared_from_this());
+        poses_subscriber_ = create_subscription<geometry_msgs::msg::PoseArray>("detected_surfaces", 10, std::bind(&RepairInterface::detectSurfacesCallback, this, std::placeholders::_1));
+        startMenu();
+        renderer_publisher_ = create_publisher<Marker>("visualize_detected_surfaces", 10);
+        selector_publisher_ = create_publisher<geometry_msgs::msg::PoseArray>("selected_surface", 10);
+        selector_server_ = std::make_unique<interactive_markers::InteractiveMarkerServer>("selector", shared_from_this());
     }
 
     void detectSurfacesCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg) {
@@ -144,29 +152,47 @@ public:
     }
 
     void selectSurface(int id) {
-        // Debug
-        std::cout << std::endl;
-        std::cout << "///////////////////////" << std::endl;
-        std::cout << "Plane[" << id << "] selected!" << std::endl;
-        m_planes[id].print();
-        std::cout << "///////////////////////" << std::endl;
-        // Send to execution
-        geometry_msgs::msg::PoseArray msg;
-        msg.header.frame_id = "base_link";
-        msg.header.stamp = rclcpp::Clock().now();
-        for (const auto &corner : m_planes[id].corners()) {
-            geometry_msgs::msg::Pose pose;
-            pose.position.x = corner[0];
-            pose.position.y = corner[1];
-            pose.position.z = corner[2];
-            pose.orientation.w = 1.0f;
-            msg.poses.push_back(pose);
-        }
-        selector_publisher_->publish(msg);
-        // Clear screen
-        clearMarkers();
+        std::cout << "Plane[" << id << "] selected! Making it interactive with menu." << std::endl;
+        //createOrUpdateInteractiveMarkerForSurface(id);
     }
+    // void createOrUpdateInteractiveMarkerForSurface(int id) {
+    //     auto &selectedPlane = m_planes[id];
 
+    //     visualization_msgs::msg::InteractiveMarker int_marker;
+    //     int_marker.header.frame_id = "base_link";
+    //     int_marker.header.stamp = rclcpp::Clock().now();
+    //     int_marker.name = "selected_surface_" + std::to_string(id);
+    //     int_marker.description = "Selected Surface";
+
+    //     auto centroid = selectedPlane.centroid();
+    //     int_marker.pose.position.x = centroid[0];
+    //     int_marker.pose.position.y = centroid[1];
+    //     int_marker.pose.position.z = centroid[2];
+    //     int_marker.scale = 1.0;
+
+    //     visualization_msgs::msg::InteractiveMarkerControl control;
+    //     control.always_visible = true;
+    //     control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::BUTTON;
+    //     control.name = "menu_control";
+    //     int_marker.controls.push_back(control);
+
+    //     selector_server_->insert(int_marker);
+    //     applyMenu(id);
+    //     selector_server_->applyChanges();
+    // }
+
+    // void applyMenu(int id) {
+    //     Menu::EntryHandle entry = menu_handler_.insert("Actions");
+    //     menu_handler_.insert(entry, "Action 1", std::bind(&RepairInterface::menuCallback, this, std::placeholders::_1));
+    //     menu_handler_.insert(entry, "Action 2", std::bind(&RepairInterface::menuCallback, this, std::placeholders::_1));
+
+    //     menu_handler_.apply(*selector_server_, "selected_surface_" + std::to_string(id));
+    // }
+    // void menuCallback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback) {
+    //     RCLCPP_INFO(this->get_logger(), "Menu item %ld clicked", feedback->menu_entry_id);
+    // }
+
+    
     void clearMarkers() {
         Marker marker;
         marker.header.stamp = rclcpp::Clock().now();
@@ -179,6 +205,83 @@ public:
         showPlane(plane, id);
         showEdge(plane, id);
         showSelector(plane, id);
+    }
+    void createPlane(const Plane &plane, int id) {
+        clearMarkers();
+        auto marker = makePlane(plane, id);
+        auto int_plane = makeMenuPlane("TaskAction", marker);
+        // Add the interactive marker to the server
+        selector_server_->insert(int_plane);
+        menu_handler_.apply(*selector_server_, "TaskAction");
+        // Apply changes to the interactive marker server
+        selector_server_->applyChanges();
+    }
+    Marker makePlane(const Plane &plane, int id) {
+        Marker marker;
+        marker.type = Marker::TRIANGLE_LIST;
+        marker.header.frame_id = "base_link";
+        marker.header.stamp = rclcpp::Clock().now();
+        marker.action = Marker::ADD;
+        marker.ns = "repair_surfaces";
+        marker.id = id;
+        marker.pose.orientation.w = 1.0f;
+        // Scale
+        marker.scale.x = 1.0f;
+        marker.scale.y = 1.0f;
+        marker.scale.z = 1.0f;
+        // Triangle 1
+        marker.points.push_back(vector2point(plane.vertex(0)));
+        marker.points.push_back(vector2point(plane.vertex(1)));
+        marker.points.push_back(vector2point(plane.vertex(2)));
+        // Triangle 2
+        marker.points.push_back(vector2point(plane.vertex(0)));
+        marker.points.push_back(vector2point(plane.vertex(2)));
+        marker.points.push_back(vector2point(plane.vertex(3)));
+        // Color
+        marker.color.r = 1.0f;
+        marker.color.g = 0.4f;
+        marker.color.b = 0.0f;
+        marker.color.a = 0.5f;
+        return marker;
+    }
+    IntControl makePlaneControl(const Marker &p_)
+    {
+        IntControl planeControl;
+        planeControl.always_visible = true;
+        planeControl.markers.push_back(p_);
+        planeControl.interaction_mode = IntControl::BUTTON;
+
+        return planeControl;
+    }
+    IntMarker makeMenuPlane(const std::string &name, const Marker &p_)
+    {
+        IntMarker plane;
+        plane.header.frame_id = "base_link";
+        plane.name = name;
+        plane.description = "Selected Plane";
+
+        plane.controls.push_back(makePlaneControl(p_));
+
+        // free move
+
+        // rotational controls
+        //  IntControl rControl;
+        //  rControl.orientation_mode = IntControl::VIEW_FACING;
+        //  rControl.interaction_mode = IntControl::ROTATE_AXIS;
+        //  rControl.orientation.w = 1.0;
+        //  rControl.name = "rotate";
+        //  plane.controls.push_back(rControl);
+
+        // IntControl mControl;
+        // mControl.orientation_mode = IntControl::VIEW_FACING;
+        // mControl.interaction_mode = IntControl::MOVE_PLANE;
+        // mControl.independent_marker_orientation = true;
+        // mControl.name = "move";
+        // mControl.markers.push_back(p_);
+        // mControl.always_visible = true;
+        // plane.controls.push_back(mControl);
+
+        return plane;
     }
 
     void showPlane(const Plane &plane, int id) {
@@ -246,10 +349,10 @@ public:
 
         // Add the control to the interactive marker
         int_marker.controls.push_back(button_control);
+        menu_handler_.apply(*selector_server_, "TaskAction");
 
         // Add the interactive marker to the server
         selector_server_->insert(int_marker, std::bind(&RepairInterface::processFeedback, this, std::placeholders::_1));
-
         // Apply changes to the interactive marker server
         selector_server_->applyChanges();
     }
@@ -261,7 +364,6 @@ public:
             std::string selected_id_str = feedback->marker_name.substr(std::string("repair_surface_").length());
             int selected_id = std::stoi(selected_id_str);
 
-            selectSurface(selected_id);
 
             // Clear all interactive markers except the selected one
             for (size_t i = 0; i < m_planes.size(); ++i) {
@@ -273,9 +375,10 @@ public:
 
             // Clear all visualization markers except those related to the selected sphere/plane
             clearVisualizationMarkersExcept(selected_id);
+            selectSurface(selected_id);
 
             // Apply changes to the interactive marker server to reflect the updates
-            selector_server_->applyChanges();
+            // selector_server_->applyChanges();
         }
     }
 
@@ -289,7 +392,7 @@ public:
 
         // Now republish only the markers related to the selected plane
         // This assumes you have a way to identify or recreate the markers based on the plane ID
-        showMarkers(m_planes[selected_id], selected_id);
+        createPlane(m_planes[selected_id], selected_id);
     }
 
  
@@ -341,11 +444,49 @@ public:
     }
 
 private:
+    void startMenu()
+    {
+        // first entry
+        interactions = menu_handler_.insert("Interactions");
+        //grind = menu_handler_.insert(interactions, "Grind", std::bind(&TaskAction::grindCallback, this, _1));
+        // Menu::EntryHandle paint = menu_handler_.insert(interactions, "Paint");
+        // Menu::EntryHandle vacum = menu_handler_.insert(interactions, "Vacum");
+
+        // next steps
+        // Menu::EntryHandle whole_plane = menu_handler_.insert(grind, "whole_plane");
+        // Menu::EntryHandle select_area = menu_handler_.insert(grind, "select_area");
+
+        // second entry
+        // Menu::EntryHandle details = menu_handler_.insert("Details");
+
+        // part of the example code
+        //  entry = menu_handler_.insert(entry, "sub");
+        //  entry = menu_handler_.insert(entry, "menu", [this](const MarkerFeedback::ConstSharedPtr)
+        //                                                                                          {
+        //                                                                                              RCLCPP_INFO(get_logger(), "the menu has been found");
+        //                                                                                          });
+        // menu_handler_.setCheckState(menu_handler_.insert("something", std::bind(&TaskAction::enableCallback, this, _1)), Menu::CHECKED);
+
+        // third entry
+        // Menu::EntryHandle selected_surface_submenu = menu_handler_.insert("switch");
+        // std::vector<std::string> types{"PLANE", "SPHERE", "CYLINDER", "CUBE"};
+        // for (int i = 0; i < 4; ++i)
+        // {
+        //     std::ostringstream s;
+        //     s << types[i];
+        //     next_entry = menu_handler_.insert(selected_surface_submenu, s.str(), std::bind(&TaskAction::modeCallback, this, _1));
+        //     menu_handler_.setCheckState(next_entry, Menu::UNCHECKED);
+        // }
+
+        // menu_handler_.setCheckState(next_entry, Menu::CHECKED);
+    }
+    Menu::EntryHandle interactions;
     rclcpp::Publisher<Marker>::SharedPtr renderer_publisher_;
     rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr poses_subscriber_;
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr selector_publisher_;
     std::unique_ptr<interactive_markers::InteractiveMarkerServer> selector_server_;
     std::vector<Plane> m_planes;
+    Menu menu_handler_;
 };
 
 int main(int argc, char **argv)

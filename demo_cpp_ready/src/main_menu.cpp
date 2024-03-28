@@ -116,27 +116,24 @@ private:
 
         plane.controls.push_back(makePlaneControl(p_));
 
-       
-
         // Arrow movement
 
         IntControl control;
         control.orientation.w = 1;
+        // move x
         control.orientation.x = 1;
         control.orientation.y = 0;
         control.orientation.z = 0;
-        // move x
         control.name = "move_x";
         control.interaction_mode = IntControl::MOVE_AXIS;
         plane.controls.push_back(control);
-
+        //move y
         control.orientation.x = 0;
         control.orientation.y = 1;
         control.orientation.z = 0;
         control.name = "move_y";
         control.interaction_mode = IntControl::MOVE_AXIS;
         plane.controls.push_back(control);
-
         // move y
         control.orientation.x = 0;
         control.orientation.y = 0;

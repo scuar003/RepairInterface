@@ -22,16 +22,16 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 add_executable(main_menu src/main_menu.cpp)
 ament_target_dependencies(main_menu rclcpp visualization_msgs interactive_markers geometry_msgs std_msgs)
 
-add_executable(surface_interaction src/surface_interaction.cpp)
-ament_target_dependencies(surface_interaction rclcpp visualization_msgs interactive_markers geometry_msgs std_msgs)
+add_executable(task_action src/task_action.cpp)
+ament_target_dependencies(task_action rclcpp visualization_msgs interactive_markers geometry_msgs std_msgs)
 
-add_executable(surface_visualizer src/surface_visualizer.cpp)
-ament_target_dependencies(surface_visualizer rclcpp visualization_msgs interactive_markers geometry_msgs std_msgs)
+add_executable(repair_interface src/repair_interface.cpp)
+ament_target_dependencies(repair_interface rclcpp visualization_msgs interactive_markers geometry_msgs std_msgs)
 
 # Install executable
 install(TARGETS
-  surface_visualizer  #shows the surfaces and lets select desire surface
-  surface_interaction #places surface and lets select area for task execution 
+  repair_interface  #shows the surfaces and lets select desire surface
+  task_action #places surface and lets select area for task execution 
   main_menu           # Main menu of all available operations. 
   DESTINATION lib/${PROJECT_NAME})
 

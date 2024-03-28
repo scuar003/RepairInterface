@@ -10,14 +10,14 @@ def generate_launch_description():
         ),
         Node(
             package='demo_cpp_ready',
-            executable='surface_visualizer',
+            executable='repair_interface',
             output='screen'
         ),
-        # Node(
-        #     package='demo_cpp_ready',
-        #     executable='surface_interaction',
-        #     output='screen'
-        # ),
+        Node(
+            package='demo_cpp_ready',
+            executable='task_action',
+            output='screen'
+        ),
         Node(
             package='demo_py_ready',
             executable='surface_detection',

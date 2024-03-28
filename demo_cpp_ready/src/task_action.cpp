@@ -2,11 +2,16 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <iostream>
 #include <Eigen/Dense>
+
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
+#include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/vector3.hpp>
+
 
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/interactive_marker.hpp>
@@ -24,7 +29,102 @@ using IntControl = visualization_msgs::msg::InteractiveMarkerControl;
 using IntMarker = visualization_msgs::msg::InteractiveMarker;
 using Menu = interactive_markers::MenuHandler;
 using MarkerFeedback = visualization_msgs::msg::InteractiveMarkerFeedback;
-using Evector = Eigen::Vector3d;
+using Vector = Eigen::Vector3d;
+
+Vector pose2vector(const geometry_msgs::msg::Pose &pose)
+{
+    return Vector(pose.position.x, pose.position.y, pose.position.z);
+}
+
+geometry_msgs::msg::Point vector2point(const Vector &v)
+{
+    geometry_msgs::msg::Point p;
+    p.x = v[0];
+    p.y = v[1];
+    p.z = v[2];
+    return p;
+}
+
+std::vector<Vector> poses2vectors(const geometry_msgs::msg::PoseArray &poses)
+{
+    std::vector<Vector> v;
+    for (const auto &pose : poses.poses)
+        v.push_back(pose2vector(pose));
+    return v;
+}
+
+class Plane
+{
+public:
+    Plane(const Vector &c1, const Vector &c2, const Vector &c3, const Vector &c4) {
+        m_corners.resize(4);
+        m_corners[0] = c1;
+        m_corners[1] = c2;
+        m_corners[2] = c3;
+        m_corners[3] = c4;
+        normalize();
+    }
+
+    std::vector<Vector> corners() const { return m_corners; }
+
+    Vector vertex(int i) const { return m_corners[i]; }
+
+    Vector centroid() const {
+        return 0.25*(m_corners[0] + m_corners[1] + m_corners[2] + m_corners[3]);
+    }
+
+    Vector normal() const {
+        Vector u = m_corners[1] - m_corners[0];
+        Vector v = m_corners[2] - m_corners[0];
+        Vector n = u.cross(v).normalized();
+        return n;
+    }
+
+    Eigen::Quaterniond quaternion() const {
+        Vector n = normal();
+        Eigen::Quaterniond q;
+        q.setFromTwoVectors(Vector::UnitZ(), n);
+        return q;
+    }
+
+    double length() const {
+        return (m_corners[1] - m_corners[0]).norm();
+    }
+
+    double width() const {
+        return (m_corners[2] - m_corners[1]).norm();
+    }
+
+    void normalize() {
+        Vector c = centroid();
+        Vector n = normal();
+        // Calculate perpendicular vectors on the plane
+        Vector v = (std::abs(n.z()) < 0.9) ? Vector(0, 0, 1) : Vector(1, 0, 0);
+        Vector i = n.cross(v).normalized();
+        Vector j = n.cross(i).normalized();
+        // Sides
+        double l = length();
+        double w = width();
+        // calculate four corners
+        m_corners[0] = c + 0.5 * l * i + 0.5 * w * j;
+        m_corners[1] = c + 0.5 * l * i - 0.5 * w * j;
+        m_corners[2] = c - 0.5 * l * i - 0.5 * w * j;
+        m_corners[3] = c - 0.5 * l * i + 0.5 * w * j;
+    }
+
+    void print() {
+        std::cout << "Plane: {";
+        for ( const auto &corner : m_corners)
+            std::cout << corner << ",";
+        std::cout << "}" << std::endl;
+    }
+
+private:
+    std::vector<Vector> m_corners;
+    Vector m_size;
+};
+
+
 
 class TaskAction : public rclcpp::Node
 {
@@ -32,30 +132,38 @@ public:
     // constructor
     // initializations
     TaskAction() : Node("TaskAction") {}
-
     void init()
     {
         server_ = std::make_unique<Server>("Task_server", shared_from_this());
         startMenu();
-        repair_execute_publisher = create_publisher<geometry_msgs::msg::PoseArray>("repair_area_corners", 10);
-        selected_surface_sub = create_subscription<geometry_msgs::msg::PoseArray>("repair_area", 10, std::bind(&TaskAction::poseArrayCallback, this, _1));
-        selected_area_publisher = create_publisher<Marker>("corner_publisher", 10);
+        renderer_publisher_ = create_publisher<Marker>("visualize_detected_surfaces", 10);
+        repair_execute_publisher = create_publisher<geometry_msgs::msg::PoseArray>("repair_area", 10);
+        surface_sub = create_subscription<geometry_msgs::msg::PoseArray>("selected_surface",10, std::bind(&TaskAction::poseArrayCallback, this, _1)); 
         selected_area_subscriber = create_subscription<geometry_msgs::msg::PointStamped>("/clicked_point", 10, std::bind(&TaskAction::selectedAreaCallback, this, _1));
+        
     }
 
 private:
     void poseArrayCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
-    {
-        for (const auto &pose : msg->poses)
-            s_points.push_back(pose.position);
-
-        if (s_points.size() == 4)
         {
-            createPlane();
-            s_points.clear(); // Clear points for next plane
-            // plane_points.clear();
+            auto v = poses2vectors(*msg);
+            int n = v.size();
+            //check if multiple of 4
+            if(!n % 4){
+                std::cout << "Ops, no plane was selected" <<std::endl;
+                return;
+            }
+            //
+            m_planes.clear();
+            for (int i = 0; i < n; i +=4){
+                m_planes.push_back(Plane(v[i],v[i + 1], v[i + 2], v[i + 3]));
+            }
+            std::cout << "selected_plane " << std::endl;
+            for (long unsigned int i = 0; i < m_planes.size(); ++i)
+                createPlane(m_planes[i], i);
+
         }
-    }
+   
     void selectedAreaCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg)
     {
         // Collect points until we have four
@@ -72,81 +180,35 @@ private:
             repair_area.clear(); // Ready to collect new points for another area
         }
     }
-
-    void createPlane()
-    {
-        if (s_points.size() != 4)
-        {
-            RCLCPP_ERROR(this->get_logger(), "Insufficient points to form a plane");
-            return;
-        }
-
-        Evector centroid(0, 0, 0);
-        for (const auto &point : s_points)
-        {
-            centroid += Evector(point.x, point.y, point.z);
-        }
-        centroid /= s_points.size();
-
-        // Compute normal vector
-        Evector vec1 = Evector(s_points[1].x, s_points[1].y, s_points[1].z) - Evector(s_points[0].x, s_points[0].y, s_points[0].z);
-        Evector vec2 = Evector(s_points[2].x, s_points[2].y, s_points[2].z) - Evector(s_points[0].x, s_points[0].y, s_points[0].z);
-        Evector normal = vec1.cross(vec2).normalized();
-
-        // Calculate perpendicular vectors on the plane
-        Evector arbitraryVec = (std::abs(normal.z()) < 0.9) ? Evector(0, 0, 1) : Evector(1, 0, 0);
-        Evector vecX = normal.cross(arbitraryVec).normalized();
-        Evector vecY = normal.cross(vecX).normalized();
-
-        Eigen::Quaterniond q;
-        q.setFromTwoVectors(Evector::UnitZ(), normal);
-
-        double length = distance(s_points[0], s_points[1]);
-        double width = distance(s_points[1], s_points[2]);
-
-        // vec1.normalize();
-        // vec2.normalize();
-        Evector halflengthVec = vecY * (length / 2.0);
-        Evector halfwidthVec = vecX * (width / 2.0);
-
-        // calculate four corners
-        Evector corner1 = centroid + halflengthVec + halfwidthVec;
-        Evector corner2 = centroid + halflengthVec - halfwidthVec;
-        Evector corner3 = centroid - halflengthVec - halfwidthVec;
-        Evector corner4 = centroid - halflengthVec + halfwidthVec;
-
-        // send points
-
-        plane_points.push_back(evectortoPoint(corner1));
-        plane_points.push_back(evectortoPoint(corner2));
-        plane_points.push_back(evectortoPoint(corner3));
-        plane_points.push_back(evectortoPoint(corner4));
-
-        // use to test
-        RCLCPP_INFO(this->get_logger(), "Corner 1: (%.2f, %.2f, %.2f)", corner1.x(), corner1.y(), corner1.z());
-        RCLCPP_INFO(this->get_logger(), "Corner 2: (%.2f, %.2f, %.2f)", corner2.x(), corner2.y(), corner2.z());
-        RCLCPP_INFO(this->get_logger(), "Corner 3: (%.2f, %.2f, %.2f)", corner3.x(), corner3.y(), corner3.z());
-        RCLCPP_INFO(this->get_logger(), "Corner 4: (%.2f, %.2f, %.2f)", corner4.x(), corner4.y(), corner4.z());
-
-        // use to test
-
-        if (plane_points.size() > 3)
-            plane_points = std::vector<geometry_msgs::msg::Point>(plane_points.end() - 4, plane_points.end());
-
-        auto marker = makePlane(width, length); // Adjust the scale based on the calculated dimensions
-        marker.pose.position.x = centroid.x();
-        marker.pose.position.y = centroid.y();
-        marker.pose.position.z = centroid.z();
-        marker.pose.orientation.x = q.x();
-        marker.pose.orientation.y = q.y();
-        marker.pose.orientation.z = q.z();
-        marker.pose.orientation.w = q.w(); // Adjust the scale as needed
-
-        auto int_marker = makeMenuPlane("TaskAction", marker);
-        server_->insert(int_marker);
+    void createPlane(const Plane &plane, int id) {
+        clearMarkers();
+        auto marker = makePlane(plane, id);
+        auto int_plane = makeMenuPlane("TaskAction", marker);
+        // Add the interactive marker to the server
+        server_->insert(int_plane);
         menu_handler_.apply(*server_, "TaskAction");
+        // Apply changes to the interactive marker server
         server_->applyChanges();
     }
+    void clearMarkers() {
+        Marker marker;
+        marker.header.stamp = rclcpp::Clock().now();
+        marker.action = Marker::DELETEALL;
+        marker.header.frame_id = "base_link";
+        renderer_publisher_->publish(marker);
+    }
+
+
+    // void createPlane(const Marker::SharedPtr marker_msg)
+    // {
+    //    
+    //     //auto marker = makePlane(marker_msg); // Adjust the scale based on the calculated dimensions
+    //     auto int_marker = makeMenuPlane("TaskAction", marker_msg);
+    //     server_->insert(int_marker);
+    //     menu_handler_.apply(*server_, "TaskAction");
+    //     server_->applyChanges();
+        
+    // }
     void repairArea()
     {
         // Check if we have exactly four points
@@ -166,7 +228,7 @@ private:
         line_strip.action = Marker::ADD;
 
         // LINE_STRIP markers use only the x component of scale, for the line width
-        line_strip.scale.x = 0.02; // Specify a suitable line width
+        line_strip.scale.x = 0.01; // Specify a suitable line width
 
         // Set the color of the line strip
         line_strip.color.r = 1.0f;
@@ -190,7 +252,7 @@ private:
         RCLCPP_INFO(this->get_logger(), "Published repair area marker.");
     }
 
-    geometry_msgs::msg::Point evectortoPoint(const Evector &eigen_vec)
+    geometry_msgs::msg::Point evectortoPoint(const Vector &eigen_vec)
     {
         geometry_msgs::msg::Point point;
         point.x = eigen_vec.x();
@@ -277,18 +339,28 @@ private:
         server_->applyChanges();
     }
 
-    Marker makePlane(double length, double width)
+    Marker makePlane(const Plane &plane, int id)
     {
-        Marker pType;
-        pType.type = Marker::CUBE;
         // type, scale, color
-        pType.scale.x = length;
-        pType.scale.y = width;
+        Marker pType;
+        pType.type = Marker::TRIANGLE_LIST;
+        pType.id = id;
+        pType.scale.x = 1.0f;
+        pType.scale.y = 1.0f;
         pType.scale.z = 0.01;
         pType.color.r = 0.0f;
         pType.color.g = 1.0f;
         pType.color.b = 0.0f;
         pType.color.a = 1.0;
+        pType.pose.orientation.w = 1.0f;
+
+        pType.points.push_back(vector2point(plane.vertex(0)));
+        pType.points.push_back(vector2point(plane.vertex(1)));
+        pType.points.push_back(vector2point(plane.vertex(2)));
+        //
+        pType.points.push_back(vector2point(plane.vertex(0)));
+        pType.points.push_back(vector2point(plane.vertex(2)));
+        pType.points.push_back(vector2point(plane.vertex(3)));
 
         return pType;
     }
@@ -306,8 +378,7 @@ private:
         IntMarker plane;
         plane.header.frame_id = "base_link";
         plane.name = name;
-        plane.description = "Interactive Plane";
-        plane.scale = 1.0;
+        plane.description = "Selected Plane";
 
         plane.controls.push_back(makePlaneControl(p_));
 
@@ -321,14 +392,14 @@ private:
         //  rControl.name = "rotate";
         //  plane.controls.push_back(rControl);
 
-        IntControl mControl;
-        mControl.orientation_mode = IntControl::VIEW_FACING;
-        mControl.interaction_mode = IntControl::MOVE_PLANE;
-        mControl.independent_marker_orientation = true;
-        mControl.name = "move";
-        mControl.markers.push_back(p_);
-        mControl.always_visible = true;
-        plane.controls.push_back(mControl);
+        // IntControl mControl;
+        // mControl.orientation_mode = IntControl::VIEW_FACING;
+        // mControl.interaction_mode = IntControl::MOVE_PLANE;
+        // mControl.independent_marker_orientation = true;
+        // mControl.name = "move";
+        // mControl.markers.push_back(p_);
+        // mControl.always_visible = true;
+        // plane.controls.push_back(mControl);
 
         return plane;
     }
@@ -350,12 +421,18 @@ private:
     ////////////////////////////////////////////////////////////////////////////////////////////////
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr repair_execute_publisher;
     rclcpp::Publisher<Marker>::SharedPtr selected_area_publisher;
-    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr selected_surface_sub;
+    rclcpp::Publisher<Marker>::SharedPtr renderer_publisher_;
+
+    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr surface_sub;
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr selected_area_subscriber;
     std::vector<geometry_msgs::msg::Point> repair_area;
     std::vector<geometry_msgs::msg::Point> repair_area_corners;
     std::vector<geometry_msgs::msg::Point> s_points;
     std::vector<geometry_msgs::msg::Point> plane_points;
+    std::vector<Plane> m_planes;
+   
+
+
 };
 
 int main(int argc, char **argv)
