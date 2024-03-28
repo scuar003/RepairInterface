@@ -14,12 +14,14 @@
 #include "visualization_msgs/msg/interactive_marker_feedback.hpp"
 #include <geometry_msgs/msg/point.hpp>
 
-using namespace std::placeholders; // For _1 in std::bind
+using namespace std::placeholders; 
 using Marker = visualization_msgs::msg::Marker;
 using Vector = Eigen::Vector3d;
 using Menu = interactive_markers::MenuHandler;
 using IntControl = visualization_msgs::msg::InteractiveMarkerControl;
 using IntMarker = visualization_msgs::msg::InteractiveMarker;
+using MarkerFeedback = visualization_msgs::msg::InteractiveMarkerFeedback;
+
 
 
 
@@ -125,7 +127,6 @@ public:
         poses_subscriber_ = create_subscription<geometry_msgs::msg::PoseArray>("detected_surfaces", 10, std::bind(&RepairInterface::detectSurfacesCallback, this, std::placeholders::_1));
         startMenu();
         renderer_publisher_ = create_publisher<Marker>("visualize_detected_surfaces", 10);
-        selector_publisher_ = create_publisher<geometry_msgs::msg::PoseArray>("selected_surface", 10);
         selector_server_ = std::make_unique<interactive_markers::InteractiveMarkerServer>("selector", shared_from_this());
     }
 
@@ -151,48 +152,6 @@ public:
             showMarkers(m_planes[i], i);
     }
 
-    void selectSurface(int id) {
-        std::cout << "Plane[" << id << "] selected! Making it interactive with menu." << std::endl;
-        //createOrUpdateInteractiveMarkerForSurface(id);
-    }
-    // void createOrUpdateInteractiveMarkerForSurface(int id) {
-    //     auto &selectedPlane = m_planes[id];
-
-    //     visualization_msgs::msg::InteractiveMarker int_marker;
-    //     int_marker.header.frame_id = "base_link";
-    //     int_marker.header.stamp = rclcpp::Clock().now();
-    //     int_marker.name = "selected_surface_" + std::to_string(id);
-    //     int_marker.description = "Selected Surface";
-
-    //     auto centroid = selectedPlane.centroid();
-    //     int_marker.pose.position.x = centroid[0];
-    //     int_marker.pose.position.y = centroid[1];
-    //     int_marker.pose.position.z = centroid[2];
-    //     int_marker.scale = 1.0;
-
-    //     visualization_msgs::msg::InteractiveMarkerControl control;
-    //     control.always_visible = true;
-    //     control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::BUTTON;
-    //     control.name = "menu_control";
-    //     int_marker.controls.push_back(control);
-
-    //     selector_server_->insert(int_marker);
-    //     applyMenu(id);
-    //     selector_server_->applyChanges();
-    // }
-
-    // void applyMenu(int id) {
-    //     Menu::EntryHandle entry = menu_handler_.insert("Actions");
-    //     menu_handler_.insert(entry, "Action 1", std::bind(&RepairInterface::menuCallback, this, std::placeholders::_1));
-    //     menu_handler_.insert(entry, "Action 2", std::bind(&RepairInterface::menuCallback, this, std::placeholders::_1));
-
-    //     menu_handler_.apply(*selector_server_, "selected_surface_" + std::to_string(id));
-    // }
-    // void menuCallback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback) {
-    //     RCLCPP_INFO(this->get_logger(), "Menu item %ld clicked", feedback->menu_entry_id);
-    // }
-
-    
     void clearMarkers() {
         Marker marker;
         marker.header.stamp = rclcpp::Clock().now();
@@ -312,10 +271,32 @@ public:
         marker.color.a = 0.5f;
         renderer_publisher_->publish(marker);
     }
-
+    void showEdge(const Plane &plane, int id) {
+        Marker marker;
+        marker.type = Marker::LINE_STRIP;
+        marker.header.frame_id = "base_link";
+        marker.header.stamp = rclcpp::Clock().now();
+        marker.action = Marker::ADD;
+        marker.ns = "repair_surfaces";
+        marker.id = id + 200;
+        marker.pose.orientation.w = 1.0f;
+        marker.scale.x = 0.01f;
+        // Vectors
+        marker.points.push_back(vector2point(plane.vertex(0)));
+        marker.points.push_back(vector2point(plane.vertex(1)));
+        marker.points.push_back(vector2point(plane.vertex(2)));
+        marker.points.push_back(vector2point(plane.vertex(3)));
+        marker.points.push_back(vector2point(plane.vertex(0)));
+        // Color
+        marker.color.r = 1.0f;
+        marker.color.g = 0.0f;
+        marker.color.b = 0.0f;
+        marker.color.a = 0.5f;
+        renderer_publisher_->publish(marker);
+    }
     void showSelector(const Plane &plane, int id) {
         // Create an interactive marker
-        visualization_msgs::msg::InteractiveMarker int_marker;
+        IntMarker int_marker;
         int_marker.header.frame_id = "base_link";
         int_marker.header.stamp = rclcpp::Clock().now();
         int_marker.name = "repair_surface_" + std::to_string(id);
@@ -329,8 +310,8 @@ public:
         int_marker.scale = 0.1; // Adjust the scale of the interactive marker if necessary
 
         // Create a sphere control for the interactive marker
-        visualization_msgs::msg::InteractiveMarkerControl button_control;
-        button_control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::BUTTON;
+        IntControl button_control;
+        button_control.interaction_mode = IntControl::BUTTON;
         button_control.name = "button_control";
 
         // Add a sphere to the button control
@@ -356,14 +337,12 @@ public:
         // Apply changes to the interactive marker server
         selector_server_->applyChanges();
     }
-    void processFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback) {
-        if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::BUTTON_CLICK) {
+    void processFeedback(const MarkerFeedback::ConstSharedPtr &feedback) {
+        if (feedback->event_type == MarkerFeedback::BUTTON_CLICK) {
             std::cout << "Button for surface " << feedback->marker_name << " pressed." << std::endl;
-
             // Extract the numeric ID from the marker name assuming it follows the "repair_surface_<id>" format
             std::string selected_id_str = feedback->marker_name.substr(std::string("repair_surface_").length());
             int selected_id = std::stoi(selected_id_str);
-
 
             // Clear all interactive markers except the selected one
             for (size_t i = 0; i < m_planes.size(); ++i) {
@@ -374,51 +353,15 @@ public:
             }
 
             // Clear all visualization markers except those related to the selected sphere/plane
-            clearVisualizationMarkersExcept(selected_id);
-            selectSurface(selected_id);
+            selectedPlane(selected_id);
 
-            // Apply changes to the interactive marker server to reflect the updates
-            // selector_server_->applyChanges();
         }
     }
 
-    void clearVisualizationMarkersExcept(int selected_id) {
-        // Publish a delete message for all markers except those related to the selected ID
-        Marker delete_marker;
-        delete_marker.header.frame_id = "base_link";
-        delete_marker.header.stamp = rclcpp::Clock().now();
-        delete_marker.action = Marker::DELETEALL;
-        renderer_publisher_->publish(delete_marker);
-
-        // Now republish only the markers related to the selected plane
-        // This assumes you have a way to identify or recreate the markers based on the plane ID
+    void selectedPlane(int selected_id) {
+        // Now creates the marker related to the selected plane
+        clearMarkers();
         createPlane(m_planes[selected_id], selected_id);
-    }
-
- 
-    
-    void showEdge(const Plane &plane, int id) {
-        Marker marker;
-        marker.type = Marker::LINE_STRIP;
-        marker.header.frame_id = "base_link";
-        marker.header.stamp = rclcpp::Clock().now();
-        marker.action = Marker::ADD;
-        marker.ns = "repair_surfaces";
-        marker.id = id + 200;
-        marker.pose.orientation.w = 1.0f;
-        marker.scale.x = 0.01f;
-        // Vectors
-        marker.points.push_back(vector2point(plane.vertex(0)));
-        marker.points.push_back(vector2point(plane.vertex(1)));
-        marker.points.push_back(vector2point(plane.vertex(2)));
-        marker.points.push_back(vector2point(plane.vertex(3)));
-        marker.points.push_back(vector2point(plane.vertex(0)));
-        // Color
-        marker.color.r = 1.0f;
-        marker.color.g = 0.0f;
-        marker.color.b = 0.0f;
-        marker.color.a = 0.5f;
-        renderer_publisher_->publish(marker);
     }
 
     void showPath(const std::vector<Vector> &path, int id)
@@ -480,13 +423,14 @@ private:
 
         // menu_handler_.setCheckState(next_entry, Menu::CHECKED);
     }
+
     Menu::EntryHandle interactions;
+    Menu menu_handler_;
+
     rclcpp::Publisher<Marker>::SharedPtr renderer_publisher_;
     rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr poses_subscriber_;
-    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr selector_publisher_;
     std::unique_ptr<interactive_markers::InteractiveMarkerServer> selector_server_;
     std::vector<Plane> m_planes;
-    Menu menu_handler_;
 };
 
 int main(int argc, char **argv)
