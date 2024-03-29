@@ -112,11 +112,12 @@ def omit_far_points(max_distance, pcd):
     filtered_pcd.points = o3d.utility.Vector3dVector(filtered_points) # add points
     return filtered_pcd
 
+
 class PlaneFinder(Node):
     def __init__(self):
         super().__init__('surface_detection')
         self.subscription = self.create_subscription(PointCloud2, '/camera/camera/depth/color/points', self.camera_callback, 10)
-        self.publisher_ = self.create_publisher(PoseArray, 'detected_surfaces', 10)
+        self.publisher_planes = self.create_publisher(PoseArray, 'detected_surfaces', 10)
         self.command_subscriber = self.create_subscription(String, 'repair_command', self.command_callback, 10)
         # Transofrms
         self.tf_buffer = tf2_ros.Buffer()
@@ -142,12 +143,17 @@ class PlaneFinder(Node):
         points = remove_outliers(points, 100, 1)
         planes = detect_planes(points)
         corners = []
+        orientations = []
         for plane in planes:
             plane_corners = get_corners_of_plane_of_interest(plane)
+            plane_orient = get_dir_of_longest_extent(plane)
+            orientations.append(plane_orient)
             for corner in plane_corners:
                 corners.append(corner)
         print('Detected {} surfaces!'.format(len(planes)))
+
         self.publish_corners(corners)
+        
         
     def publish_corners(self, points):
         target_frame = "base_link"  # Define the target frame
@@ -166,7 +172,7 @@ class PlaneFinder(Node):
                 msg.poses.append(vector2pose([transformed_pose.point.x, transformed_pose.point.y, transformed_pose.point.z]))
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                 self.get_logger().error(f'Error transforming point: {e}')
-        self.publisher_.publish(msg)
+        self.publisher_planes.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)
