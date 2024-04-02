@@ -13,6 +13,7 @@
 #include "visualization_msgs/msg/interactive_marker_control.hpp"
 #include "visualization_msgs/msg/interactive_marker_feedback.hpp"
 #include <geometry_msgs/msg/point.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
 
 using namespace std::placeholders; 
 using Marker = visualization_msgs::msg::Marker;
@@ -124,10 +125,13 @@ public:
     RepairInterface() : Node("repair_interface") {}
 
     void init() {
-        poses_subscriber_ = create_subscription<geometry_msgs::msg::PoseArray>("detected_surfaces", 10, std::bind(&RepairInterface::detectSurfacesCallback, this, std::placeholders::_1));
-        startMenu();
-        renderer_publisher_ = create_publisher<Marker>("visualize_detected_surfaces", 10);
         selector_server_ = std::make_unique<interactive_markers::InteractiveMarkerServer>("selector", shared_from_this());
+        startMenu();
+        poses_subscriber_ = create_subscription<geometry_msgs::msg::PoseArray>("detected_surfaces", 10, std::bind(&RepairInterface::detectSurfacesCallback, this, std::placeholders::_1));
+        selected_area_subscriber = create_subscription<geometry_msgs::msg::PointStamped>("/clicked_point", 10, std::bind(&RepairInterface::selectedAreaCallback, this, _1));
+        renderer_publisher_ = create_publisher<Marker>("visualize_detected_surfaces", 10);
+        selected_area_publisher = create_publisher<Marker>("selected_area", 10);
+        repair_execute_publisher = create_publisher<geometry_msgs::msg::PoseArray>("repair_area", 10);
     }
 
     void detectSurfacesCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg) {
@@ -422,14 +426,74 @@ public:
     }
 
 private:
+    void selectedAreaCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg)
+    {
+        // Collect points until we have four
+        if (repair_area.size() < 4)
+        {
+            repair_area.push_back(msg->point);
+            RCLCPP_INFO(this->get_logger(), "Point collected: (%.2f, %.2f, %.2f)", msg->point.x, msg->point.y, msg->point.z);
+        }
+
+        // When four points are collected, draw the line strip and then clear the points for a new area
+        if (repair_area.size() == 4)
+        {
+            repairArea();
+            repair_area.clear(); // Ready to collect new points for another area
+        }
+    }
+    void repairArea()
+    {
+        // Check if we have exactly four points
+        if (repair_area.size() != 4)
+        {
+            RCLCPP_ERROR(this->get_logger(), "Expecting exactly four points to form the repair area.");
+            return;
+        }
+
+        // Create a LINE_STRIP marker to represent the repair area
+        Marker line_strip;
+        line_strip.header.frame_id = "base_link";
+        line_strip.header.stamp = rclcpp::Clock().now();
+        line_strip.ns = "repair_area";
+        line_strip.id = 0; // Unique ID for this marker
+        line_strip.type = Marker::LINE_STRIP;
+        line_strip.action = Marker::ADD;
+
+        // LINE_STRIP markers use only the x component of scale, for the line width
+        line_strip.scale.x = 0.01; // Specify a suitable line width
+
+        // Set the color of the line strip
+        line_strip.color.r = 1.0f;
+        line_strip.color.g = 0.0f;
+        line_strip.color.b = 0.0f;
+        line_strip.color.a = 1.0f; // Don't forget to set the alpha!
+
+        // Assign the points from plane_points to the marker
+        for (const auto &point : repair_area)
+        {
+            line_strip.points.push_back(point);
+        }
+        // Connect the last point to the first to close the loop
+        line_strip.points.push_back(repair_area[0]);
+
+        repair_area_corners = repair_area; 
+
+        // Publish the marker
+        selected_area_publisher->publish(line_strip);
+
+        RCLCPP_INFO(this->get_logger(), "Published repair area marker.");
+    }
     void startMenu()
     {
         // first entry
         interactions = menu_handler_.insert("Interactions");
-        //grind = menu_handler_.insert(interactions, "Grind", std::bind(&TaskAction::grindCallback, this, _1));
-        // Menu::EntryHandle paint = menu_handler_.insert(interactions, "Paint");
-        // Menu::EntryHandle vacum = menu_handler_.insert(interactions, "Vacum");
+        grind = menu_handler_.insert(interactions, "Grind", std::bind(&RepairInterface::taskGrind, this, _1));
+        paint = menu_handler_.insert(interactions, "Paint", std::bind(&RepairInterface::taskPaint, this, _1));
+        vacum = menu_handler_.insert(interactions, "Vacum", std::bind(&RepairInterface::taskVacum, this, _1));
 
+        //second entry
+        clear_selection = menu_handler_.insert("Clear Selection", std::bind(&RepairInterface::taskClearSelection, this, _1));
         // next steps
         // Menu::EntryHandle whole_plane = menu_handler_.insert(grind, "whole_plane");
         // Menu::EntryHandle select_area = menu_handler_.insert(grind, "select_area");
@@ -445,27 +509,77 @@ private:
         //                                                                                          });
         // menu_handler_.setCheckState(menu_handler_.insert("something", std::bind(&TaskAction::enableCallback, this, _1)), Menu::CHECKED);
 
-        // third entry
-        // Menu::EntryHandle selected_surface_submenu = menu_handler_.insert("switch");
-        // std::vector<std::string> types{"PLANE", "SPHERE", "CYLINDER", "CUBE"};
-        // for (int i = 0; i < 4; ++i)
-        // {
-        //     std::ostringstream s;
-        //     s << types[i];
-        //     next_entry = menu_handler_.insert(selected_surface_submenu, s.str(), std::bind(&TaskAction::modeCallback, this, _1));
-        //     menu_handler_.setCheckState(next_entry, Menu::UNCHECKED);
-        // }
+    }
+    //First menu entry
+    void taskGrind (const MarkerFeedback::ConstSharedPtr &feedback) {
 
-        // menu_handler_.setCheckState(next_entry, Menu::CHECKED);
+        if(feedback -> menu_entry_id == grind) {
+            geometry_msgs::msg::PoseArray corners;
+            corners.header.frame_id = "base_link";
+            corners.header.stamp = get_clock() -> now();
+            for (const auto &point : repair_area_corners){
+                geometry_msgs::msg::Pose pose;
+                pose.position.x = point.x;
+                pose.position.y = point.y;
+                pose.position.z = point.z;
+
+                pose.orientation.x = 0.0f;
+                pose.orientation.y = 0.0f;
+                pose.orientation.z = 0.0f;
+                pose.orientation.w = 1.0f;
+
+                corners.poses.push_back(pose);
+            }
+            std::cout << "Publishing corners!" << std::endl; 
+            repair_execute_publisher->publish(corners);
+        
+        }
     }
 
-    Menu::EntryHandle interactions;
-    Menu menu_handler_;
+    void taskPaint (const MarkerFeedback::ConstSharedPtr &feedback) {}
 
+    void taskVacum (const MarkerFeedback::ConstSharedPtr &feedback) {}
+    
+    //second menu entry
+    void taskClearSelection (const MarkerFeedback::ConstSharedPtr &feedback) {
+  
+        Marker clear_marker;
+        clear_marker.header.frame_id = "base_link"; // Same frame_id as the original marker
+        clear_marker.header.stamp = rclcpp::Clock().now();
+        clear_marker.ns = "repair_area"; // Same namespace as the original marker
+        clear_marker.id = 0; // Same ID as the original marker
+        clear_marker.action = Marker::DELETE; // Action set to DELETE
+
+        // Publish the clear_marker to remove the previously published marker
+        selected_area_publisher->publish(clear_marker);
+
+        RCLCPP_INFO(this->get_logger(), "Repair area marker cleared.");
+
+        repair_area.clear();
+    }
+    
+
+
+
+    //declarations
+    Menu menu_handler_; //
+    Menu::EntryHandle interactions; // first entry
+    Menu::EntryHandle grind, paint, vacum; //possible operations  
+    Menu::EntryHandle clear_selection;
+    
     rclcpp::Publisher<Marker>::SharedPtr renderer_publisher_;
-    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr poses_subscriber_;
+    rclcpp::Publisher<Marker>::SharedPtr selected_area_publisher;
     std::unique_ptr<interactive_markers::InteractiveMarkerServer> selector_server_;
+
+    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr poses_subscriber_;
+    rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr selected_area_subscriber;
+    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr repair_execute_publisher;
+
+
     std::vector<Plane> m_planes;
+    std::vector<geometry_msgs::msg::Point> repair_area;
+    std::vector<geometry_msgs::msg::Point> repair_area_corners;
+
 };
 
 int main(int argc, char **argv)

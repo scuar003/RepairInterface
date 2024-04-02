@@ -53,18 +53,6 @@ private:
         op3 = menu_handler_.insert("Soon...");
         op4 = menu_handler_.insert("Soon...");
 
-        // Menu::EntryHandle sub_menu = menu_handler_.insert("switch");
-        // std::vector<std::string>types{"PLANE", "SPHERE", "CYLINDER", "CUBE"};
-
-        // for (int i = 0; i <4; ++i)
-        // {
-        //     std::ostringstream s;
-        //     s << types[i];
-        //     next_entry = menu_handler_.insert(sub_menu, s.str(), std::bind(&IntMenu::modeCallback, this, _1));
-        //     menu_handler_.setCheckState(next_entry, Menu::UNCHECKED);
-        // }
-
-        // menu_handler_.setCheckState(next_entry, Menu::CHECKED);
     }
     void detectSurfaces(const MarkerFeedback::ConstSharedPtr &feedback) {
         if (feedback->menu_entry_id == command_detect_surfaces_)
