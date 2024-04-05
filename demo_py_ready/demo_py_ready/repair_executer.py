@@ -36,20 +36,33 @@ def rotation_matrix_to_rotation_vector(rot):
         return np.array([0, 0, 0])
 
 # Calculate the orientation for grinding based on the points
-def getOrientation(points):
-    p1 = points[0]
-    p2 = points[1]
-    p4 = points[3]
-    v1 = p2 - p1
-    v2 = p4 - p1
-    z_axis = normalize(np.cross(v1, v2))
-    x_axis = normalize(np.cross([0, 0, -1], z_axis))
-    if np.linalg.norm(x_axis) == 0:
-        x_axis = normalize(np.cross([0, 1, 0], z_axis))
-    y_axis = normalize(np.cross(z_axis, x_axis))
-    rot = np.array([x_axis, y_axis, z_axis]).T
-    rotation_vector = rotation_matrix_to_rotation_vector(rot)
-    return rotation_vector
+def vector_to_euler_angles(target_normal):
+   """Convert a target normal vector into Euler angles (roll, pitch, yaw) for a UR16e robot arm."""
+   # Initial direction vector (end-effector pointing up along the z-axis)
+   initial_vector = np.array([0, 0, 1])
+   target_normal = normalize(target_normal)
+   
+   # Rotation axis (cross product of initial and target vectors)
+   rotation_axis = np.cross(initial_vector, target_normal)
+   rotation_axis_normalized = normalize(rotation_axis)
+   
+   # Angle of rotation (using the dot product and arccosine)
+   cos_angle = np.dot(initial_vector, target_normal)
+   angle = np.arccos(cos_angle)
+   
+   # Convert axis-angle to quaternion
+   qx = rotation_axis_normalized[0] * np.sin(angle / 2)
+   qy = rotation_axis_normalized[1] * np.sin(angle / 2)
+   qz = rotation_axis_normalized[2] * np.sin(angle / 2)
+   qw = np.cos(angle / 2)
+   
+   # Convert quaternion to Euler angles (roll, pitch, yaw)
+   # Assuming a 'zyx' rotation order
+   roll = np.arctan2(2 * (qw * qx + qy * qz), 1 - 2 * (qx**2 + qy**2))
+   pitch = np.arcsin(2 * (qw * qy - qz * qx))
+   yaw = np.arctan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy**2 + qz**2))
+   
+   return roll, pitch, yaw
 
 # Generate waypoints for grinding
 def offset(corner, offset, normal):
@@ -76,28 +89,41 @@ def generateWaypoints(grid_size, lift_distance, lower, rx, ry, rz, points):
        lifted_position = move_end + np.array([0, 0, lift_distance])
        waypoints.append((lifted_position[0], lifted_position[1], lifted_position[2], rx, ry, rz))
        if pass_num < num_passes - 1:
-           next_start_at_lifted_height = current_position + shift_vector + np.array([0, 0, lift_distance])
-           waypoints.append((next_start_at_lifted_height[0], next_start_at_lifted_height[1], next_start_at_lifted_height[2], rx, ry, rz))
-           waypoints.append((next_start_at_lifted_height[0], next_start_at_lifted_height[1], next_start_at_lifted_height[2], rx, ry, rz))
-           next_start_lowered = next_start_at_lifted_height - np.array([0, 0, lift_distance])
-           waypoints.append((next_start_lowered[0], next_start_lowered[1], next_start_lowered[2], rx, ry, rz))
-           current_position = next_start_lowered
+           neaxt_start_at_lifted_height = current_position + shift_vector + np.array([0, 0, lift_distance])
+           waypoints.append((neaxt_start_at_lifted_height[0], neaxt_start_at_lifted_height[1], neaxt_start_at_lifted_height[2], rx, ry, rz))
+           waypoints.append((neaxt_start_at_lifted_height[0], neaxt_start_at_lifted_height[1], neaxt_start_at_lifted_height[2], rx, ry, rz))
+           neaxt_start_lowered = neaxt_start_at_lifted_height - np.array([0, 0, lift_distance])
+           waypoints.append((neaxt_start_lowered[0], neaxt_start_lowered[1], neaxt_start_lowered[2], rx, ry, rz))
+           current_position = neaxt_start_lowered
    return waypoints
 
 # Perform the grinding task
 def grindSurface(ur_control, acc, vel,  numPasses, points):
    home(ur_control.robot, 0.5, 0.5)
+   ur_control.robot.set_payload(2.170)
+   ur_control.robot.set_tcp((0, -0.143, 0.19300749, 0, 0, 0))
    waypoints = []
    gridSize = 0.01
    liftDistance = 0.01
-#    orientation = getOrientation(points)
-   rx = 0
-   ry = 0
-   rz = 0
-   if rx == 0 and ry == 0 and rz == 0:
-       rx = 0
-       ry = 3.14
-       rz = 0
+   normal_vector = normalize(np.cross(points[1] - points[0], points[2] - points[0]))
+   orientation = vector_to_euler_angles(normal_vector)
+   eax = orientation[0]
+   eay = orientation[1]
+   eaz = orientation[2]
+   o = ur_control.robot.get_orientation()
+   o.rotate_xb(eax)
+   o.rotate_yb(eay)
+   o.rotate_zb(eaz)
+   ur_control.robot.set_orientation(o)
+   print("got jose bricked up")
+   linearPosition = ur_control.robot.getl() 
+   rx = linearPosition[3] 
+   print(rx)
+   ry = linearPosition[4]
+   print(ry)
+   rz = linearPosition[5]
+   print(rz)
+   print("________________________________________________________________")
    waypoints = []
    tempx = []
    tempy = []
@@ -107,9 +133,9 @@ def grindSurface(ur_control, acc, vel,  numPasses, points):
    lowerDistance = 0.005
    while count <= numPasses - 1:
        if count == 0:
-           waypoints = generateWaypoints(gridSize, liftDistance, 0 * count, rx, ry, rz + GRIND_ANGLE, points)
+           waypoints = generateWaypoints(gridSize, liftDistance, 0 * count, rx, ry, rz, points)
        else:
-           waypoints = generateWaypoints(gridSize, liftDistance, lowerDistance * count, rx, ry, rz + GRIND_ANGLE, points)
+           waypoints = generateWaypoints(gridSize, liftDistance, lowerDistance * count, rx, ry, rz, points)
        ur_control.show_path(waypoints) 
        passOver = 0
        while passOver <= PASSES - 1:
@@ -139,9 +165,9 @@ class URControlNode(Node):
         self.clear_path()
         self.points_list.clear()
         for pose in msg.poses:
-            processed_point = np.array([-round(pose.position.x, 2), 
-                                        -round(pose.position.y, 2), 
-                                         round(pose.position.z, 2)])
+            processed_point = np.array([-round(pose.position.x , 2 ), 
+                                        -round(pose.position.y , 2 ), 
+                                         round(pose.position.z , 2 )])
             self.points_list.append(processed_point)
         # Make sure there are four corners
         if len(self.points_list) >= 4:
@@ -149,16 +175,32 @@ class URControlNode(Node):
             self.control_ur_robot()
 
     def control_ur_robot(self):
-        points = np.array(self.points_list)
-        self.robot = urx.Robot(self.robot_ip)
-        home(self.robot, 0.8, 0.8)
-        removemm = 2
-        numPasses = np.floor(removemm / 0.5)
-        home(self.robot,0.8,0.8)
-        grindSurface(self, 0.1, 0.1, numPasses, points)
-        home(self.robot,0.8,0.8)
-        self.robot.close()
-        self.robot = None
+        connected = False
+        tries = 0
+        maxTries= 5
+        while not connected and tries < maxTries:
+            try:
+                time.sleep(0.3)
+                robot = urx.Robot("172.16.3.114")
+                time.sleep(0.3)
+                connected = True
+            except:
+                tries += 1
+                print(f"Connection attempt {tries} failed.")
+                time.sleep(1)  # Wait for a second before next attempt
+        if connected:
+            points = np.array(self.points_list)
+            self.robot = urx.Robot(self.robot_ip)
+            home(self.robot, 0.8, 0.8)
+            removemm = 2
+            numPasses = np.floor(removemm / 0.5)
+            home(self.robot,0.8,0.8)
+            grindSurface(self, 0.1, 0.1, numPasses, points)
+            home(self.robot,0.8,0.8)
+            self.robot.close()
+            self.robot = None
+        else:
+            print("mani has the solution up his ass")
 
     def show_path(self, waypoints):
         marker = Marker() 

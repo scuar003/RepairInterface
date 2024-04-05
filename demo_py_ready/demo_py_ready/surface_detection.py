@@ -116,7 +116,7 @@ def omit_far_points(max_distance, pcd):
 class PlaneFinder(Node):
     def __init__(self):
         super().__init__('surface_detection')
-        self.subscription = self.create_subscription(PointCloud2, '/camera/camera/depth/color/points', self.camera_callback, 10)
+        self.subscription = self.create_subscription(PointCloud2, '/camera/depth/color/points', self.camera_callback, 10)
         self.publisher_planes = self.create_publisher(PoseArray, 'detected_surfaces', 10)
         self.command_subscriber = self.create_subscription(String, 'repair_command', self.command_callback, 10)
         # Transofrms
@@ -143,11 +143,9 @@ class PlaneFinder(Node):
         points = remove_outliers(points, 100, 1)
         planes = detect_planes(points)
         corners = []
-        orientations = []
         for plane in planes:
             plane_corners = get_corners_of_plane_of_interest(plane)
-            plane_orient = get_dir_of_longest_extent(plane)
-            orientations.append(plane_orient)
+
             for corner in plane_corners:
                 corners.append(corner)
         print('Detected {} surfaces!'.format(len(planes)))
