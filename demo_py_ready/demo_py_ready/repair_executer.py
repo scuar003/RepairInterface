@@ -100,8 +100,10 @@ def generateWaypoints(grid_size, lift_distance, lower, rx, ry, rz, points):
 # Perform the grinding task
 def grindSurface(ur_control, acc, vel,  numPasses, points):
    home(ur_control.robot, 0.5, 0.5)
-   ur_control.robot.set_payload(2.170)
-   ur_control.robot.set_tcp((0, -0.143, 0.19300749, 0, 0, 0))
+#    ur_control.robot.set_payload(2.170)
+#    ur_control.robot.set_tcp((0, -0.143, 0.19300749, 0, 0, 0))
+   ur_control.robot.set_payload(1.200)
+   ur_control.robot.set_tcp((0, 0, 0.21963, 0, 0, 0))
    waypoints = []
    gridSize = 0.01
    liftDistance = 0.01

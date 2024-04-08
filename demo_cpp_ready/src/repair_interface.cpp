@@ -271,15 +271,15 @@ public:
         marker.points.push_back(vector2point(plane.vertex(1)));
         marker.points.push_back(vector2point(plane.vertex(2)));
         // Triangle 2
-        marker.points.push_back(vector2point(plane.vertex(1)));
-        marker.points.push_back(vector2point(plane.vertex(2)));
         marker.points.push_back(vector2point(plane.vertex(3)));
+        marker.points.push_back(vector2point(plane.vertex(2)));
+        marker.points.push_back(vector2point(plane.vertex(0)));
         // Color
         
         marker.color.r = 1.0f;
         marker.color.g = 0.4f;
         marker.color.b = 0.0f;
-        marker.color.a = 0.7f;
+        marker.color.a = 0.25f;
         renderer_publisher_->publish(marker);
     }
     void showCorners(const Plane &plane, int id) {

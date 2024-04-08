@@ -48,61 +48,101 @@ private:
 
     void startMenu() {
         command_detect_surfaces_ = menu_handler_.insert("Detect Surfaces", std::bind(&IntMenu::detectSurfaces, this, _1));
-        op1 = menu_handler_.insert("Cut Pipe", std::bind(&IntMenu::cutPipe, this, _1));
-        op2 = menu_handler_.insert("Grind Angle Surface", std::bind(&IntMenu::angleSurface, this, _1));
-        op3 = menu_handler_.insert("Soon...");
+        
+        //move commands 
+        command_move = menu_handler_.insert("Move");
+        move_home = menu_handler_.insert(command_move, "Home", std::bind(&IntMenu::moveHome, this, _1));
+        move_3d_Mouse = menu_handler_.insert(command_move, "3D Mouse", std::bind(&IntMenu::move3DMouse, this, _1));
+        move_keyboard = menu_handler_.insert(command_move, "Keyboard", std::bind(&IntMenu::moveKeyboard, this, _1));
+
+        
+        
+        //Tools commands 
+        command_tools = menu_handler_.insert("Tools");
+        grinder = menu_handler_.insert(command_tools, "Grinders");
+        p_grinder = menu_handler_.insert(grinder, "P-Grinder", std::bind(&IntMenu::getTool, this, _1));
+        h_grinder = menu_handler_.insert(grinder, "H-Grinder", std::bind(&IntMenu::getTool, this, _1));
+        vacuum = menu_handler_.insert(command_tools, "Vacuum", std::bind(&IntMenu::getTool, this, _1));
+        gripper = menu_handler_.insert(command_tools, "Gripper", std::bind(&IntMenu::getTool, this, _1));
+        marker = menu_handler_.insert(command_tools, "Marker", std::bind(&IntMenu::getTool, this, _1));
+
         op4 = menu_handler_.insert("Soon...");
+        //clear markers on screen 
+        clear_objects = menu_handler_.insert("Clear", std::bind(&IntMenu::clearObjects, this, _1));
 
     }
+    //Detection callback
     void detectSurfaces(const MarkerFeedback::ConstSharedPtr &feedback) {
         if (feedback->menu_entry_id == command_detect_surfaces_)
             execute("detect surfaces");
     }
-    void cutPipe(const MarkerFeedback::ConstSharedPtr &feedback){
-        if (feedback->menu_entry_id == op1)
-            execute("cut pipe");
+
+    //moves Callbacks 
+    void moveHome(const MarkerFeedback::ConstSharedPtr &feedback){
+        if (feedback->menu_entry_id == move_home)
+            execute("move home");
     }
-    void angleSurface(const MarkerFeedback::ConstSharedPtr &feedback){
-        if (feedback->menu_entry_id == op2)
+    void move3DMouse(const MarkerFeedback::ConstSharedPtr &feedback) {
+        if (feedback -> menu_entry_id == move_3d_Mouse){
+            execute("3D Mouse");
+        }
+    }
+    void moveKeyboard(const MarkerFeedback::ConstSharedPtr &feedback){
+        if(feedback -> menu_entry_id == move_keyboard){
+            execute("Keyboard");
+        }
+    }
+
+    //clear callback
+    void clearObjects(const MarkerFeedback::ConstSharedPtr &feedback){
+        if (feedback->menu_entry_id == clear_objects)
+            
             execute("grinding");
     }
 
+    //Get tools 
+    void getTool (const MarkerFeedback::ConstPtr &feedback) {
+
+    }
+
+
+
     Marker makePlane(const float scale)
     {
-        Marker pType;
-        pType.type = Marker::SPHERE;
+        Marker menuType;
+        menuType.type = Marker::SPHERE;
         // type, scale, color
-        pType.scale.x = scale * 0.45;
-        pType.scale.y = scale * 0.45;
-        pType.scale.z = scale * 0.45;
-        pType.color.r = 1.0f;
-        pType.color.g = 1.0f;
-        pType.color.b = 1.0f;
-        pType.color.a = 1.0;
+        menuType.scale.x = scale * 0.25;
+        menuType.scale.y = scale * 0.25;
+        menuType.scale.z = scale * 0.25;
+        menuType.color.r = 1.0f;
+        menuType.color.g = 1.0f;
+        menuType.color.b = 1.0f;
+        menuType.color.a = 1.0;
 
-        return pType;
+        return menuType;
     }
     IntControl makePlaneControl(const Marker &p_)
     {
-        IntControl planeControl;
-        planeControl.always_visible = true;
-        planeControl.markers.push_back(p_);
-        planeControl.interaction_mode = IntControl::BUTTON;
+        IntControl menuControl;
+        menuControl.always_visible = true;
+        menuControl.markers.push_back(p_);
+        menuControl.interaction_mode = IntControl::BUTTON;
 
-        return planeControl;
+        return menuControl;
     }
     IntMarker makeMenuPlane(const std::string &name, const Marker &p_)
     {
-        IntMarker plane;
-        plane.header.frame_id = "base_link";
-        plane.pose.position.x = 1.0;
-        plane.pose.position.y = 1.0;
-        plane.pose.position.z = 1.0;
-        plane.name = name;
-        plane.description = "Menu";
-        plane.scale = 0.50;
+        IntMarker menu;
+        menu.header.frame_id = "base_link";
+        menu.pose.position.x = 1.0;
+        menu.pose.position.y = 1.0;
+        menu.pose.position.z = 1.0;
+        menu.name = name;
+        menu.description = "Menu";
+        menu.scale = 0.25;
 
-        plane.controls.push_back(makePlaneControl(p_));
+        menu.controls.push_back(makePlaneControl(p_));
 
         // Arrow movement
 
@@ -114,21 +154,21 @@ private:
         control.orientation.z = 0;
         control.name = "move_x";
         control.interaction_mode = IntControl::MOVE_AXIS;
-        plane.controls.push_back(control);
+        menu.controls.push_back(control);
         //move y
         control.orientation.x = 0;
         control.orientation.y = 1;
         control.orientation.z = 0;
         control.name = "move_y";
         control.interaction_mode = IntControl::MOVE_AXIS;
-        plane.controls.push_back(control);
+        menu.controls.push_back(control);
         // move y
         control.orientation.x = 0;
         control.orientation.y = 0;
         control.orientation.z = 1;
         control.name = "move_z";
         control.interaction_mode = IntControl::MOVE_AXIS;
-        plane.controls.push_back(control);
+        menu.controls.push_back(control);
 
         // rotation controls
         IntControl rotateX_control;
@@ -138,7 +178,7 @@ private:
         rotateX_control.orientation.x = 1;
         rotateX_control.orientation.y = 0;
         rotateX_control.orientation.z = 0;
-        plane.controls.push_back(rotateX_control);
+        menu.controls.push_back(rotateX_control);
 
         IntControl rotateY_control;
         rotateY_control.name = "rotate_x";
@@ -147,7 +187,7 @@ private:
         rotateY_control.orientation.x = 0;
         rotateY_control.orientation.y = 1;
         rotateY_control.orientation.z = 0;
-        plane.controls.push_back(rotateY_control);
+        menu.controls.push_back(rotateY_control);
 
         IntControl rotateZ_control;
         rotateZ_control.name = "rotate_x";
@@ -156,15 +196,19 @@ private:
         rotateZ_control.orientation.x = 1;
         rotateZ_control.orientation.y = 0;
         rotateZ_control.orientation.z = 0;
-        plane.controls.push_back(rotateZ_control);
+        menu.controls.push_back(rotateZ_control);
 
-        return plane;
+        return menu;
     }
     // Declarations
     std::unique_ptr<Server> server_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr command_publisher_;
     Menu menu_handler_;
-    Menu::EntryHandle command_detect_surfaces_, op1, op2, op3, op4;
+    Menu::EntryHandle command_detect_surfaces_, 
+                      command_move, move_home, move_3d_Mouse, move_keyboard,  
+                      command_tools, grinder, p_grinder, h_grinder, vacuum, gripper, marker, 
+                      op4,
+                      clear_objects;
     Menu::EntryHandle next_entry;
 };
 
