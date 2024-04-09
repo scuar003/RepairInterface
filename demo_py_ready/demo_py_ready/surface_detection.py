@@ -117,8 +117,9 @@ class PlaneFinder(Node):
     def __init__(self):
         super().__init__('surface_detection')
         self.subscription = self.create_subscription(PointCloud2, '/camera/depth/color/points', self.camera_callback, 10)
+        # self.subscription = self.create_subscription(PointCloud2, 'pcl_data', self.camera_callback, 10)
         self.publisher_planes = self.create_publisher(PoseArray, 'detected_surfaces', 10)
-        self.command_subscriber = self.create_subscription(String, 'repair_command', self.command_callback, 10)
+        self.command_subscriber = self.create_subscription(String, 'menu_action', self.command_callback, 10)
         # Transofrms
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)

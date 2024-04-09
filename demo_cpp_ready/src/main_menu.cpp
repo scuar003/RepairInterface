@@ -35,7 +35,7 @@ public:
         menu_handler_.apply(*server_, "IntMenu");
         server_->applyChanges();
         // Commands
-        command_publisher_ = create_publisher<std_msgs::msg::String>("repair_command", 10);
+        command_publisher_ = create_publisher<std_msgs::msg::String>("menu_action", 10);
     }
 
 private:
@@ -47,47 +47,51 @@ private:
     }
 
     void startMenu() {
-        command_detect_surfaces_ = menu_handler_.insert("Detect Surfaces", std::bind(&IntMenu::detectSurfaces, this, _1));
+
+        //Actions - Interactions
+        menu_repair = menu_handler_.insert("Repair Operations");
+        detect_surfaces = menu_handler_.insert(menu_repair, "Detect Surfaces", std::bind(&IntMenu::repairOperation, this, _1));
         
+
         //move commands 
-        command_move = menu_handler_.insert("Move");
-        move_home = menu_handler_.insert(command_move, "Home", std::bind(&IntMenu::moveHome, this, _1));
-        move_3d_Mouse = menu_handler_.insert(command_move, "3D Mouse", std::bind(&IntMenu::move3DMouse, this, _1));
-        move_keyboard = menu_handler_.insert(command_move, "Keyboard", std::bind(&IntMenu::moveKeyboard, this, _1));
+        menu_move = menu_handler_.insert("Move");
+        move_home = menu_handler_.insert(menu_move, "Home", std::bind(&IntMenu::moveCommand, this, _1));
+        move_3d_Mouse = menu_handler_.insert(menu_move, "3D Mouse", std::bind(&IntMenu::moveCommand, this, _1));
+        move_keyboard = menu_handler_.insert(menu_move, "Keyboard", std::bind(&IntMenu::moveCommand, this, _1));
 
         
         
-        //Tools commands 
-        command_tools = menu_handler_.insert("Tools");
-        grinder = menu_handler_.insert(command_tools, "Grinders");
+        //Tools  
+        menu_tools = menu_handler_.insert("Get/Change Tools");
+        grinder = menu_handler_.insert(menu_tools, "Grinders");
         p_grinder = menu_handler_.insert(grinder, "P-Grinder", std::bind(&IntMenu::getTool, this, _1));
         h_grinder = menu_handler_.insert(grinder, "H-Grinder", std::bind(&IntMenu::getTool, this, _1));
-        vacuum = menu_handler_.insert(command_tools, "Vacuum", std::bind(&IntMenu::getTool, this, _1));
-        gripper = menu_handler_.insert(command_tools, "Gripper", std::bind(&IntMenu::getTool, this, _1));
-        marker = menu_handler_.insert(command_tools, "Marker", std::bind(&IntMenu::getTool, this, _1));
+        vacuum = menu_handler_.insert(menu_tools, "Vacuum", std::bind(&IntMenu::getTool, this, _1));
+        gripper = menu_handler_.insert(menu_tools, "Gripper", std::bind(&IntMenu::getTool, this, _1));
+        marker = menu_handler_.insert(menu_tools, "Marker", std::bind(&IntMenu::getTool, this, _1));
 
+        //Dashboard options 
         op4 = menu_handler_.insert("Soon...");
+
         //clear markers on screen 
         clear_objects = menu_handler_.insert("Clear", std::bind(&IntMenu::clearObjects, this, _1));
 
     }
-    //Detection callback
-    void detectSurfaces(const MarkerFeedback::ConstSharedPtr &feedback) {
-        if (feedback->menu_entry_id == command_detect_surfaces_)
+    //Interactive Actions
+    void repairOperation(const MarkerFeedback::ConstSharedPtr &feedback) {
+
+        if (feedback->menu_entry_id == detect_surfaces)
             execute("detect surfaces");
     }
 
     //moves Callbacks 
-    void moveHome(const MarkerFeedback::ConstSharedPtr &feedback){
-        if (feedback->menu_entry_id == move_home)
+    void moveCommand(const MarkerFeedback::ConstSharedPtr &feedback){
+        if (feedback->menu_entry_id == move_home){
             execute("move home");
-    }
-    void move3DMouse(const MarkerFeedback::ConstSharedPtr &feedback) {
+        }
         if (feedback -> menu_entry_id == move_3d_Mouse){
             execute("3D Mouse");
         }
-    }
-    void moveKeyboard(const MarkerFeedback::ConstSharedPtr &feedback){
         if(feedback -> menu_entry_id == move_keyboard){
             execute("Keyboard");
         }
@@ -96,7 +100,6 @@ private:
     //clear callback
     void clearObjects(const MarkerFeedback::ConstSharedPtr &feedback){
         if (feedback->menu_entry_id == clear_objects)
-            
             execute("grinding");
     }
 
@@ -204,9 +207,9 @@ private:
     std::unique_ptr<Server> server_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr command_publisher_;
     Menu menu_handler_;
-    Menu::EntryHandle command_detect_surfaces_, 
-                      command_move, move_home, move_3d_Mouse, move_keyboard,  
-                      command_tools, grinder, p_grinder, h_grinder, vacuum, gripper, marker, 
+    Menu::EntryHandle menu_repair, detect_surfaces, 
+                      menu_move, move_home, move_3d_Mouse, move_keyboard,  
+                      menu_tools, grinder, p_grinder, h_grinder, vacuum, gripper, marker, 
                       op4,
                       clear_objects;
     Menu::EntryHandle next_entry;

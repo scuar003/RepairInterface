@@ -13,11 +13,11 @@ def generate_launch_description():
             executable='repair_interface',
             output='screen'
         ),
-        # Node(
-        #     package='demo_cpp_ready',
-        #     executable='task_action',
-        #     output='screen'
-        # ),
+        Node(
+            package='move_cmd_py',
+            executable='MoveHome',
+            output='screen'
+        ),
         Node(
             package='demo_py_ready',
             executable='surface_detection',
