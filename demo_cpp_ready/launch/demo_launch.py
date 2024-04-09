@@ -13,11 +13,7 @@ def generate_launch_description():
             executable='repair_interface',
             output='screen'
         ),
-        Node(
-            package='move_cmd_py',
-            executable='MoveHome',
-            output='screen'
-        ),
+        
         Node(
             package='demo_py_ready',
             executable='surface_detection',
@@ -26,6 +22,18 @@ def generate_launch_description():
         Node(
             package='demo_py_ready',
             executable='repair_executer',
+            output='screen'
+        ),
+
+        #moves
+        Node(
+            package='move_cmd_py',
+            executable='MoveHome',
+            output='screen'
+        ),
+        Node(
+            package='move_cmd_cpp',
+            executable='move3Dmouse',
             output='screen'
         ),
     ])
