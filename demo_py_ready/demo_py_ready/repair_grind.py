@@ -1,271 +1,185 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
-import time
-import numpy as np
-from pyfirmata import Arduino 
+from geometry_msgs.msg import PoseArray
+from geometry_msgs.msg import Point
+from visualization_msgs.msg import Marker
+
 import urx
+import numpy as np
+import time
 
-
+# Convert degrees to radians
 def deg2rad(deg):
     return deg * np.pi / 180
 
-
+# Normalize a vector
 def normalize(v):
     norm = np.linalg.norm(v)
-    if norm == 0:
+    if norm == 0: 
         return v
     return v / norm
 
-
-def unlockTool(relay_pin, t):
-    relay_pin.write(0)  # Set the pin to HIGH (ON)
-    time.sleep(t)
-
-
-def lockTool(relay_pin, t):
-    relay_pin.write(1)  # Set the pin to LOW (OFF)
-    time.sleep(t)
-
-
+# Move the robot to its home position
 def home(robot, acc, vel):
-    home = (
-        deg2rad(-90),
-        deg2rad(-90),
-        deg2rad(-90),
-        deg2rad(-90),
-        deg2rad(90),
-        deg2rad(0),
-    )
-    robot.movej(home, acc, vel)
+    home_position = (deg2rad(-90), deg2rad(-90), deg2rad(-90), deg2rad(-90), deg2rad(90), deg2rad(0))
+    robot.movej(home_position, acc, vel)
 
-
-def getPCutter(robot, relay_pin):
-    home(robot, 0.7, 0.7)
-    robot.set_tcp((0, 0, 0, 0, 0, 0))
-    startPose = (
-        deg2rad(-161.57),
-        deg2rad(-136.59),
-        deg2rad(-57.66),
-        deg2rad(-73.50),
-        deg2rad(89.72),
-        deg2rad(109.87),
-    )
-    toolPose = (-0.8353, -0.0942, 0.00913, 3.141, -0.014, -0.006)
-    endPose = (-0.8353, -0.0942, 0.33297, 3.141, -0.014, -0.006)
-    robot.movej(startPose, 0.8, 0.8)
-    robot.movel(endPose, 0.4, 0.4)
-    time.sleep(1)
-    unlockTool(relay_pin, 1)
-    robot.movel(toolPose, 0.1, 0.1)
-    time.sleep(1)
-    lockTool(relay_pin, 1)
-    robot.movel(endPose, 0.3, 0.3)
-    home(robot, 0.7, 0.7)
-
-
-def returnPCutter(robot, relay_pin):
-    home(robot, 0.7, 0.7)
-    robot.set_tcp((0, 0, 0, 0, 0, 0))
-    startPose = (
-        deg2rad(-176.20),
-        deg2rad(-137.25),
-        deg2rad(-56.70),
-        deg2rad(-74.05),
-        deg2rad(90.21),
-        deg2rad(94.97),
-    )
-    toolPose = (-0.8353, -0.0942, 0.00913, 3.141, -0.014, -0.006)
-    endPose = (-0.8353, -0.0942, 0.33297, 3.141, -0.014, -0.006)
-    robot.movej(startPose, 0.8, 0.8)
-    robot.movel(endPose, 0.05, 0.5)
-    robot.movel(toolPose, 0.1, 0.1)
-    time.sleep(1)
-    unlockTool(relay_pin, 1)
-    robot.movel(endPose, 0.3, 0.3)
-    home(robot, 0.7, 0.7)
-    unlockTool(relay_pin, 1)
-
-
+# Convert a rotation matrix to a rotation vector
 def rotation_matrix_to_rotation_vector(rot):
     theta = np.arccos((np.trace(rot) - 1) / 2)
     if theta != 0:
-        rx = (rot[2, 1] - rot[1, 2]) / (2 * np.sin(theta))
-        ry = (rot[0, 2] - rot[2, 0]) / (2 * np.sin(theta))
-        rz = (rot[1, 0] - rot[0, 1]) / (2 * np.sin(theta))
-        return np.array([-rx, -ry, rz]) * theta
+        rx = (rot[2,1] - rot[1,2]) / (2 * np.sin(theta))
+        ry = (rot[0,2] - rot[2,0]) / (2 * np.sin(theta))
+        rz = (rot[1,0] - rot[0,1]) / (2 * np.sin(theta))
+        return np.array([rx, ry, rz]) * theta
     else:
         return np.array([0, 0, 0])
 
+# Calculate the orientation for grinding based on the points
+def vector_to_euler_angles(target_normal):
+   """Convert a target normal vector into Euler angles (roll, pitch, yaw) for a UR16e robot arm."""
+   # Initial direction vector (end-effector pointing up along the z-axis)
+   initial_vector = np.array([0, 0, 1])
+   target_normal = normalize(target_normal)
+   
+   # Rotation axis (cross product of initial and target vectors)
+   rotation_axis = np.cross(initial_vector, target_normal)
+   rotation_axis_normalized = normalize(rotation_axis)
+   
+   # Angle of rotation (using the dot product and arccosine)
+   cos_angle = np.dot(initial_vector, target_normal)
+   angle = np.arccos(cos_angle)
+   
+   # Convert axis-angle to quaternion
+   qx = rotation_axis_normalized[0] * np.sin(angle / 2)
+   qy = rotation_axis_normalized[1] * np.sin(angle / 2)
+   qz = rotation_axis_normalized[2] * np.sin(angle / 2)
+   qw = np.cos(angle / 2)
+   
+   # Convert quaternion to Euler angles (roll, pitch, yaw)
+   # Assuming a 'zyx' rotation order
+   roll = np.arctan2(2 * (qw * qx + qy * qz), 1 - 2 * (qx**2 + qy**2))
+   pitch = np.arcsin(2 * (qw * qy - qz * qx))
+   yaw = np.arctan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy**2 + qz**2))
+   
+   return roll, pitch, yaw
 
-def findSurface():
-    # p1 = np.array([-0.1653, -0.7599, 0.0611])
-    # p2 = np.array([-0.1653, -0.6761, 0.0611])
-    # p3 = np.array([-0.2285, -0.6761, 0.0611])
-    # p4 = np.array([-0.2285, -0.7592, 0.0611])
-    p1 = np.array([0.1391, -0.7978, 0.057])
-    p2 = np.array([0.1391, -0.7019, 0.057])
-    p3 = np.array([0.0799, -0.7019, 0.057])
-    p4 = np.array([0.0799, -0.7978, 0.057])
-    targetSurface = (p1, p2, p3, p4)
-    return targetSurface
-
-
-def getOrientation():
-    points = findSurface()
-    p1 = points[0]
-    p2 = points[1]
-    p4 = points[3]
-    v1 = p2 - p1
-    v2 = p4 - p1
-    z_axis = normalize(np.cross(v1, v2))
-    x_axis = normalize(np.cross([0, 0, -1], z_axis))
-    if np.linalg.norm(x_axis) == 0:
-        x_axis = normalize(np.cross([0, 1, 0], z_axis))
-    y_axis = normalize(np.cross(z_axis, x_axis))
-    rot = np.array([x_axis, y_axis, z_axis]).T
-    rotation_vector = rotation_matrix_to_rotation_vector(rot)
-    return rotation_vector
-
-
+# Generate waypoints for grinding
 def offset(corner, offset, normal):
-    corner_new = corner - offset * normal
-    return corner_new
+   corner_new = corner - offset*normal
+   return corner_new
 
+def generateWaypoints(grid_size, lift_distance, lower, rx, ry, rz, points):
+   op1, op2, op3, op4 = points
+   normal_vector = normalize(np.cross(op2 - op1, op3 - op1))
+   p1 = offset(op1, lower, normal_vector)
+   p2 = offset(op2, lower, normal_vector)
+   p3 = offset(op3, lower, normal_vector)
+   p4 = offset(op4, lower, normal_vector)
+   normal_vector = normalize(np.cross(p2 - p1, p3 - p1))
+   move_vector = p2 - p1
+   shift_vector = normalize(p4 - p1) * grid_size
+   num_passes = int(np.linalg.norm(p4 - p1) / grid_size) + 1
+   waypoints = []
+   current_position = p1.copy()
+   for pass_num in range(num_passes):
+       move_end = current_position + move_vector
+       waypoints.append((current_position[0], current_position[1], current_position[2], rx, ry, rz))
+       waypoints.append((move_end[0], move_end[1], move_end[2], rx, ry, rz))
+       lifted_position = move_end + np.array([0, 0, lift_distance])
+       waypoints.append((lifted_position[0], lifted_position[1], lifted_position[2], rx, ry, rz))
+       if pass_num < num_passes - 1:
+           neaxt_start_at_lifted_height = current_position + shift_vector + np.array([0, 0, lift_distance])
+           waypoints.append((neaxt_start_at_lifted_height[0], neaxt_start_at_lifted_height[1], neaxt_start_at_lifted_height[2], rx, ry, rz))
+           waypoints.append((neaxt_start_at_lifted_height[0], neaxt_start_at_lifted_height[1], neaxt_start_at_lifted_height[2], rx, ry, rz))
+           neaxt_start_lowered = neaxt_start_at_lifted_height - np.array([0, 0, lift_distance])
+           waypoints.append((neaxt_start_lowered[0], neaxt_start_lowered[1], neaxt_start_lowered[2], rx, ry, rz))
+           current_position = neaxt_start_lowered
+   return waypoints
 
-def generateWaypoints(grid_size, lift_distance, lower, rx, ry, rz):
-    points = findSurface()
-    op1, op2, op3, op4 = points
-    normal_vector = normalize(np.cross(op2 - op1, op3 - op1))
-    p1 = offset(op1, lower, normal_vector)
-    p2 = offset(op2, lower, normal_vector)
-    p3 = offset(op3, lower, normal_vector)
-    p4 = offset(op4, lower, normal_vector)
-    normal_vector = normalize(np.cross(p2 - p1, p3 - p1))
-    move_vector = p2 - p1
-    shift_vector = normalize(p4 - p1) * grid_size
-    num_passes = int(np.linalg.norm(p4 - p1) / grid_size) + 1
-    waypoints = []
-    current_position = p1.copy()
-    for pass_num in range(num_passes):
-        move_end = current_position + move_vector
-        waypoints.append(
-            (current_position[0], current_position[1], current_position[2], rx, ry, rz)
-        )
-        waypoints.append((move_end[0], move_end[1], move_end[2], rx, ry, rz))
-        lifted_position = move_end + np.array([0, 0, lift_distance])
-        waypoints.append(
-            (lifted_position[0], lifted_position[1], lifted_position[2], rx, ry, rz)
-        )
-        if pass_num < num_passes - 1:
-            next_start_at_lifted_height = (
-                current_position + shift_vector + np.array([0, 0, lift_distance])
-            )
-            waypoints.append(
-                (
-                    next_start_at_lifted_height[0],
-                    next_start_at_lifted_height[1],
-                    next_start_at_lifted_height[2],
-                    rx,
-                    ry,
-                    rz,
-                )
-            )
-            waypoints.append(
-                (
-                    next_start_at_lifted_height[0],
-                    next_start_at_lifted_height[1],
-                    next_start_at_lifted_height[2],
-                    rx,
-                    ry,
-                    rz,
-                )
-            )
-            next_start_lowered = next_start_at_lifted_height - np.array(
-                [0, 0, lift_distance]
-            )
-            waypoints.append(
-                (
-                    next_start_lowered[0],
-                    next_start_lowered[1],
-                    next_start_lowered[2],
-                    rx,
-                    ry,
-                    rz,
-                )
-            )
-            current_position = next_start_lowered
-    return waypoints
+# Perform the grinding task
+def grindSurface(ur_control, acc, vel,  numPasses, points):
+   home(ur_control.robot, 0.5, 0.5)
+#    ur_control.robot.set_payload(2.170)
+#    ur_control.robot.set_tcp((0, -0.143, 0.19300749, 0, 0, 0))
+   ur_control.robot.set_payload(1.200)
+   ur_control.robot.set_tcp((0, 0, 0.23563, 0, 0, 0))
+   waypoints = []
+   gridSize = 0.01
+   liftDistance = 0.01
+   normal_vector = normalize(np.cross(points[1] - points[0], points[2] - points[0]))
+   orientation = vector_to_euler_angles(normal_vector)
+   eax = orientation[0]
+   eay = orientation[1]
+   eaz = orientation[2]
+   o = ur_control.robot.get_orientation()
+   o.rotate_xb(eax)
+   o.rotate_yb(eay)
+   o.rotate_zb(eaz)
+   ur_control.robot.set_orientation(o)
+   print("got jose bricked up")
+   linearPosition = ur_control.robot.getl() 
+   rx = linearPosition[3] 
+   print(rx)
+   ry = linearPosition[4]
+   print(ry)
+   rz = linearPosition[5]
+   print(rz)
+   print("________________________________________________________________")
+   waypoints = []
+   tempx = []
+   tempy = []
+   PASSES = 2
+   GRIND_ANGLE = 0.420
+   count = 0
+   lowerDistance = 0.005
+   while count <= numPasses - 1:
+       if count == 0:
+           waypoints = generateWaypoints(gridSize, liftDistance, 0 * count, rx, ry, rz, points)
+       else:
+           waypoints = generateWaypoints(gridSize, liftDistance, lowerDistance * count, rx, ry, rz, points)
+       ur_control.show_path(waypoints) 
+       passOver = 0
+       while passOver <= PASSES - 1:
+           for x in waypoints:
+               ur_control.robot.movel(x,acc,vel)
+               tempx.append(x[0])
+               tempy.append(x[1])
+           passOver = passOver+ 1
+           print("we are on passover: ", passOver)
+       count = count + 1
+       print("We are on counter: ", count)
+       # Clean
+       ur_control.clear_path()
 
-
-def grindSurface(robot, acc, vel, numPasses, grinder):
-    home(robot, 0.5, 0.5)
-    # getPCutter(robot, relay_pin)
-    robot.set_payload(2.300)
-    robot.set_tcp((0, -0.143, 0.16169, 0, 0, 0))
-    waypoints = []
-    gridSize = 0.01
-    liftDistance = 0.005
-    # orientation = getOrientation()
-    rx = 0
-    ry = 0
-    rz = 0
-    if rx == 0 and ry == 0 and rz == 0:
-        rx = 0
-        ry = 3.14
-        rz = 0
-    waypoints = []
-    tempx = []
-    tempy = []
-    PASSES = 5
-    GRIND_ANGLE = 0.420
-    count = 0
-    lowerDistance = 0.0005
-    grinder.write(0)
-    while count <= numPasses - 1:
-        if count == 0:
-            waypoints = generateWaypoints(
-                gridSize, liftDistance, 0 * count, rx, ry, rz + GRIND_ANGLE
-            )
-        else:
-            waypoints = generateWaypoints(
-                gridSize, liftDistance, lowerDistance * count, rx, ry, rz + GRIND_ANGLE
-            )
-        passOver = 0
-        while passOver <= PASSES - 1:
-            for x in waypoints:
-                robot.movel(x, acc, vel)
-                tempx.append(x[0])
-                tempy.append(x[1])
-            passOver = passOver + 1
-            print("we are on passover: ", passOver)
-        count = count + 1
-        print("We are on counter: ", count)
-    grinder.write(1)
-    home(robot, 0.5, 0.5)
-    robot.set_tcp((0, 0, 0, 0, 0, 0))
-    time.sleep(0.1)
-
-
+# ROS2 Node for controlling the UR robot
 class URControlNode(Node):
-    #grind angle surface 
     def __init__(self):
-        super().__init__("ur_grind_action")
-        self.subscription = self.create_subscription(
-            String, "repair_command", self.command_callback, 10
-        )
+        super().__init__('ur_control_node')
+        self.subscription = self.create_subscription(PoseArray, 'repair_area', self.pose_array_callback, 10)
+        self.marker_publisher = self.create_publisher(Marker,'repair_path', 10)
+        self.points_list = []
         self.robot_ip = "172.16.3.114"  # Replace with your robot's IP address
         self.robot = None
 
-    def command_callback(self, msg):
-        if msg.data == "grinding":
-            print("Grinding surface ")
-            self.repairAction()
+    def pose_array_callback(self, msg):
+        # Saving corners
+        self.clear_path()
+        self.points_list.clear()
+        for pose in msg.poses:
+            processed_point = np.array([-round(pose.position.x , 2 ), 
+                                        -round(pose.position.y , 2 ), 
+                                         round(pose.position.z , 2 )])
+            self.points_list.append(processed_point)
+        # Make sure there are four corners
+        if len(self.points_list) >= 4:
+            self.points_list = self.points_list[-4:]
+            self.control_ur_robot()
 
-    def repairAction(self):
+    def control_ur_robot(self):
         connected = False
         tries = 0
-        maxTries = 5
+        maxTries= 5
         while not connected and tries < maxTries:
             try:
                 time.sleep(0.3)
@@ -277,17 +191,54 @@ class URControlNode(Node):
                 print(f"Connection attempt {tries} failed.")
                 time.sleep(1)  # Wait for a second before next attempt
         if connected:
-            board = Arduino('/dev/ttyACM0')
-            relay_pin_number = 7
-            relay_pin = board.get_pin(f'd:{relay_pin_number}:o')
-            relay_pin.write(1)
+            points = np.array(self.points_list)
+            self.robot = urx.Robot(self.robot_ip)
+            home(self.robot, 0.8, 0.8)
             removemm = 2
             numPasses = np.floor(removemm / 0.5)
-            home(robot,0.8,0.8)
-            grindSurface(robot, 0.004, 0.004, numPasses, relay_pin)
-            home(robot,0.8,0.8)
-            robot.close()
+            home(self.robot,0.8,0.8)
+            grindSurface(self, 0.1, 0.1, numPasses, points)
+            home(self.robot,0.8,0.8)
+            self.robot.close()
+            self.robot = None
+        else:
+            print("Could not connect to the arm")
 
+    def show_path(self, waypoints):
+        marker = Marker() 
+        marker.id = 1 
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.header.frame_id = "base_link"
+        marker.type = Marker.LINE_STRIP
+        marker.scale.x = 0.001
+        # Color    
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        marker.color.a = 0.5
+        # Geometry
+        marker.pose.orientation.w = 1.0
+        marker.pose.position.x = 0.0
+        marker.pose.position.y = 0.0
+        marker.pose.position.z = 0.0
+        # Waypoints
+        marker.points = []
+        for point in waypoints:
+            p = Point() 
+            p.x = -point[0]
+            p.y = -point[1]
+            p.z = point[2]
+            marker.points.append(p)
+        # Publish
+        self.marker_publisher.publish(marker)
+
+    def clear_path(self):
+        marker = Marker() 
+        marker.id = 1 
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.header.frame_id = "base_link"
+        marker.action = Marker.DELETE
+        self.marker_publisher.publish(marker)
 
 def main():
     rclpy.init()
@@ -296,6 +247,5 @@ def main():
     ur_control_node.destroy_node()
     rclpy.shutdown()
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

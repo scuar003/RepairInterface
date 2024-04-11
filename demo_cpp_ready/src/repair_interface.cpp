@@ -166,7 +166,7 @@ public:
 
     void showMarkers(const Plane &plane, int id) {
         showPlane(plane, id);
-        showEdge(plane, id);
+        //showEdge(plane, id);
         showSelector(plane, id);
         
     }
@@ -200,8 +200,8 @@ public:
         marker.points.push_back(vector2point(plane.vertex(2)));
         // Triangle 2
         marker.points.push_back(vector2point(plane.vertex(1)));
-        marker.points.push_back(vector2point(plane.vertex(2)));
         marker.points.push_back(vector2point(plane.vertex(3)));
+        marker.points.push_back(vector2point(plane.vertex(2)));
         // Color
         marker.color.r = 1.0f;
         marker.color.g = 0.4f;
@@ -257,11 +257,7 @@ public:
         marker.action = Marker::ADD;
         marker.ns = "repair_surfaces";
         marker.id = id;
-        
         marker.pose.orientation.w = 1.0f;
-;
-        
-   
         // Scale
         marker.scale.x = 1.0f;
         marker.scale.y = 1.0f;
@@ -271,43 +267,43 @@ public:
         marker.points.push_back(vector2point(plane.vertex(1)));
         marker.points.push_back(vector2point(plane.vertex(2)));
         // Triangle 2
+        marker.points.push_back(vector2point(plane.vertex(1)));
         marker.points.push_back(vector2point(plane.vertex(3)));
         marker.points.push_back(vector2point(plane.vertex(2)));
-        marker.points.push_back(vector2point(plane.vertex(0)));
         // Color
-        
         marker.color.r = 1.0f;
         marker.color.g = 0.4f;
         marker.color.b = 0.0f;
         marker.color.a = 0.25f;
         renderer_publisher_->publish(marker);
     }
+
     void showCorners(const Plane &plane, int id) {
-    for (int i = 0; i < 4; ++i) {  // Assuming each plane has 4 corners
-        Marker marker;
-        marker.type = Marker::SPHERE;
-        marker.header.frame_id = "base_link";
-        marker.header.stamp = rclcpp::Clock().now();
-        marker.action = Marker::ADD;
-        marker.ns = "repair_corners";  // Different namespace for corners
-        marker.id = id * 10 + i;  // Ensure unique ID for each corner across planes
-        marker.pose.position = vector2point(plane.vertex(i));
-        
-        // Set the orientation of the sphere to identity, as it doesn't matter for spheres
-        marker.pose.orientation.w = 1.0;
+        for (int i = 0; i < 4; ++i) {  // Assuming each plane has 4 corners
+            Marker marker;
+            marker.type = Marker::SPHERE;
+            marker.header.frame_id = "base_link";
+            marker.header.stamp = rclcpp::Clock().now();
+            marker.action = Marker::ADD;
+            marker.ns = "repair_corners";  // Different namespace for corners
+            marker.id = id * 10 + i;  // Ensure unique ID for each corner across planes
+            marker.pose.position = vector2point(plane.vertex(i));
+            
+            // Set the orientation of the sphere to identity, as it doesn't matter for spheres
+            marker.pose.orientation.w = 1.0;
 
-        // Scale represents the size of the sphere
-        marker.scale.x = 0.05f;  // Sphere diameter in meters
-        marker.scale.y = 0.05f;
-        marker.scale.z = 0.05f;
+            // Scale represents the size of the sphere
+            marker.scale.x = 0.05f;  // Sphere diameter in meters
+            marker.scale.y = 0.05f;
+            marker.scale.z = 0.05f;
 
-        // Color of the sphere
-        marker.color.r = 0.0f;
-        marker.color.g = 1.0f;
-        marker.color.b = 0.0f;
-        marker.color.a = 1.0f;  // Alpha value of 1 means the sphere is not transparent
+            // Color of the sphere
+            marker.color.r = 0.0f;
+            marker.color.g = 1.0f;
+            marker.color.b = 0.0f;
+            marker.color.a = 1.0f;  // Alpha value of 1 means the sphere is not transparent
 
-        renderer_publisher_->publish(marker);
+            renderer_publisher_->publish(marker);
     }
 }
     void showEdge(const Plane &plane, int id) {

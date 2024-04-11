@@ -50,63 +50,83 @@ private:
 
         //Actions - Interactions
         menu_repair = menu_handler_.insert("Repair Operations");
-        detect_surfaces = menu_handler_.insert(menu_repair, "Detect Surfaces", std::bind(&IntMenu::repairOperation, this, _1));
+        detect_surfaces = menu_handler_.insert(menu_repair, "Detect Surfaces", std::bind(&IntMenu::menuAction, this, _1));
         
 
         //move commands 
         menu_move = menu_handler_.insert("Move");
-        move_home = menu_handler_.insert(menu_move, "Home", std::bind(&IntMenu::moveCommand, this, _1));
-        move_3d_Mouse = menu_handler_.insert(menu_move, "3D Mouse", std::bind(&IntMenu::moveCommand, this, _1));
-        move_keyboard = menu_handler_.insert(menu_move, "Keyboard", std::bind(&IntMenu::moveCommand, this, _1));
+        move_home = menu_handler_.insert(menu_move, "Home", std::bind(&IntMenu::menuAction, this, _1));
+        move_3d_Mouse = menu_handler_.insert(menu_move, "3D Mouse", std::bind(&IntMenu::menuAction, this, _1));
+        move_keyboard = menu_handler_.insert(menu_move, "Keyboard", std::bind(&IntMenu::menuAction, this, _1));
 
         
         
         //Tools  
-        menu_tools = menu_handler_.insert("Get/Change Tools");
+        menu_tools = menu_handler_.insert("Get/Change Tools(SOON)");
         grinder = menu_handler_.insert(menu_tools, "Grinders");
-        p_grinder = menu_handler_.insert(grinder, "P-Grinder", std::bind(&IntMenu::getTool, this, _1));
-        h_grinder = menu_handler_.insert(grinder, "H-Grinder", std::bind(&IntMenu::getTool, this, _1));
-        vacuum = menu_handler_.insert(menu_tools, "Vacuum", std::bind(&IntMenu::getTool, this, _1));
-        gripper = menu_handler_.insert(menu_tools, "Gripper", std::bind(&IntMenu::getTool, this, _1));
-        marker = menu_handler_.insert(menu_tools, "Marker", std::bind(&IntMenu::getTool, this, _1));
+        p_grinder = menu_handler_.insert(grinder, "P-Grinder", std::bind(&IntMenu::menuAction, this, _1));
+        h_grinder = menu_handler_.insert(grinder, "H-Grinder", std::bind(&IntMenu::menuAction, this, _1));
+        vacuum = menu_handler_.insert(menu_tools, "Vacuum", std::bind(&IntMenu::menuAction, this, _1));
+        gripper = menu_handler_.insert(menu_tools, "Gripper", std::bind(&IntMenu::menuAction, this, _1));
+        marker = menu_handler_.insert(menu_tools, "Marker", std::bind(&IntMenu::menuAction, this, _1));
 
         //Dashboard options 
         op4 = menu_handler_.insert("Soon...");
 
         //clear markers on screen 
-        clear_objects = menu_handler_.insert("Clear", std::bind(&IntMenu::clearObjects, this, _1));
+        clear_objects = menu_handler_.insert("Clear", std::bind(&IntMenu::menuAction, this, _1));
 
     }
     //Interactive Actions
-    void repairOperation(const MarkerFeedback::ConstSharedPtr &feedback) {
+    void menuAction(const MarkerFeedback::ConstSharedPtr &feedback) {
 
+    
+    //Operations
         if (feedback->menu_entry_id == detect_surfaces)
             execute("detect surfaces");
-    }
-
-    //moves Callbacks 
-    void moveCommand(const MarkerFeedback::ConstSharedPtr &feedback){
-        if (feedback->menu_entry_id == move_home){
+    
+    //moves 
+        if (feedback->menu_entry_id == move_home)
             execute("move home");
-        }
-        if (feedback -> menu_entry_id == move_3d_Mouse){
+        
+        if (feedback -> menu_entry_id == move_3d_Mouse)
             execute("3D Mouse");
-        }
-        if(feedback -> menu_entry_id == move_keyboard){
+        
+        if(feedback -> menu_entry_id == move_keyboard)
             execute("Keyboard");
-        }
-    }
-
-    //clear callback
-    void clearObjects(const MarkerFeedback::ConstSharedPtr &feedback){
+        
+    //clear 
         if (feedback->menu_entry_id == clear_objects)
-            execute("grinding");
-    }
+            clearAll();
+    
 
     //Get tools 
-    void getTool (const MarkerFeedback::ConstPtr &feedback) {
-
+    
     }
+
+    void clearAll() {
+        auto marker_pub = this->create_publisher<visualization_msgs::msg::Marker>("visualization_marker", 10);
+        visualization_msgs::msg::Marker delete_msg;
+        delete_msg.header.frame_id = "base_link";
+        delete_msg.header.stamp = this->now();
+        delete_msg.ns = "menu_marker";
+        delete_msg.action = visualization_msgs::msg::Marker::DELETEALL;
+        marker_pub->publish(delete_msg);
+
+        // Allow some time for RViz to process the deletion
+        rclcpp::sleep_for(std::chrono::milliseconds(100));
+
+        // Step 2: Republish the menu interactive marker
+        republishMenuMarker();
+    }
+    
+    void republishMenuMarker() {
+        auto marker = makePlane(1.0);
+        auto int_marker = makeMenuPlane("IntMenu", marker);
+        server_->insert(int_marker);
+        menu_handler_.apply(*server_, "IntMenu");
+        server_->applyChanges();
+}
 
 
 
