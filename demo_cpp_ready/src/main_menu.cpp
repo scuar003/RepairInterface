@@ -34,7 +34,8 @@ public:
         server_->insert(makeMenuPlane("IntMenu", marker));
         menu_handler_.apply(*server_, "IntMenu");
         server_->applyChanges();
-        // Commands
+
+        // Commands Publisher
         command_publisher_ = create_publisher<std_msgs::msg::String>("menu_action", 10);
     }
 
@@ -51,16 +52,14 @@ private:
         //Actions - Interactions
         menu_repair = menu_handler_.insert("Repair Operations");
         detect_surfaces = menu_handler_.insert(menu_repair, "Detect Surfaces", std::bind(&IntMenu::menuAction, this, _1));
-        
+        scan_env = menu_handler_.insert(menu_repair, "Scan Environment(SOON)", std::bind(&IntMenu::menuAction, this, _1));
 
         //move commands 
         menu_move = menu_handler_.insert("Move");
         move_home = menu_handler_.insert(menu_move, "Home", std::bind(&IntMenu::menuAction, this, _1));
         move_3d_Mouse = menu_handler_.insert(menu_move, "3D Mouse", std::bind(&IntMenu::menuAction, this, _1));
-        move_keyboard = menu_handler_.insert(menu_move, "Keyboard", std::bind(&IntMenu::menuAction, this, _1));
-
-        
-        
+        move_keyboard = menu_handler_.insert(menu_move, "Keyboard(SOON)", std::bind(&IntMenu::menuAction, this, _1));
+ 
         //Tools  
         menu_tools = menu_handler_.insert("Get/Change Tools(SOON)");
         grinder = menu_handler_.insert(menu_tools, "Grinders");
@@ -71,63 +70,42 @@ private:
         marker = menu_handler_.insert(menu_tools, "Marker", std::bind(&IntMenu::menuAction, this, _1));
 
         //Dashboard options 
-        op4 = menu_handler_.insert("Soon...");
+        // op4 = menu_handler_.insert("Soon...");
 
-        //clear markers on screen 
-        clear_objects = menu_handler_.insert("Clear", std::bind(&IntMenu::menuAction, this, _1));
 
     }
     //Interactive Actions
     void menuAction(const MarkerFeedback::ConstSharedPtr &feedback) {
 
-    
     //Operations
         if (feedback->menu_entry_id == detect_surfaces)
             execute("detect surfaces");
+        if(feedback -> menu_entry_id == scan_env)
+            execute("scan env");
     
     //moves 
         if (feedback->menu_entry_id == move_home)
             execute("move home");
-        
         if (feedback -> menu_entry_id == move_3d_Mouse)
             execute("3D Mouse");
-        
         if(feedback -> menu_entry_id == move_keyboard)
             execute("Keyboard");
         
-    //clear 
-        if (feedback->menu_entry_id == clear_objects)
-            clearAll();
-    
-
     //Get tools 
+        if(feedback -> menu_entry_id == p_grinder)
+            execute("p_grinder");
+        if(feedback -> menu_entry_id == h_grinder)
+            execute("h_grinder");
+        if(feedback -> menu_entry_id == vacuum)
+            execute("vacuum");
+        if(feedback -> menu_entry_id == gripper)
+            execute("gripper");
+        if(feedback -> menu_entry_id == marker)
+            execute("marker");
+
+    //soon
     
     }
-
-    void clearAll() {
-        auto marker_pub = this->create_publisher<visualization_msgs::msg::Marker>("visualization_marker", 10);
-        visualization_msgs::msg::Marker delete_msg;
-        delete_msg.header.frame_id = "base_link";
-        delete_msg.header.stamp = this->now();
-        delete_msg.ns = "menu_marker";
-        delete_msg.action = visualization_msgs::msg::Marker::DELETEALL;
-        marker_pub->publish(delete_msg);
-
-        // Allow some time for RViz to process the deletion
-        rclcpp::sleep_for(std::chrono::milliseconds(100));
-
-        // Step 2: Republish the menu interactive marker
-        republishMenuMarker();
-    }
-    
-    void republishMenuMarker() {
-        auto marker = makePlane(1.0);
-        auto int_marker = makeMenuPlane("IntMenu", marker);
-        server_->insert(int_marker);
-        menu_handler_.apply(*server_, "IntMenu");
-        server_->applyChanges();
-}
-
 
 
     Marker makePlane(const float scale)
@@ -227,11 +205,9 @@ private:
     std::unique_ptr<Server> server_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr command_publisher_;
     Menu menu_handler_;
-    Menu::EntryHandle menu_repair, detect_surfaces, 
+    Menu::EntryHandle menu_repair, detect_surfaces, scan_env, 
                       menu_move, move_home, move_3d_Mouse, move_keyboard,  
-                      menu_tools, grinder, p_grinder, h_grinder, vacuum, gripper, marker, 
-                      op4,
-                      clear_objects;
+                      menu_tools, grinder, p_grinder, h_grinder, vacuum, gripper, marker;
     Menu::EntryHandle next_entry;
 };
 

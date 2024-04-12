@@ -166,13 +166,15 @@ public:
 
     void showMarkers(const Plane &plane, int id) {
         showPlane(plane, id);
-        //showEdge(plane, id);
+        showEdge(plane, id);
         showSelector(plane, id);
         
     }
     void createPlane(const Plane &plane, int id) {
         clearMarkers();
         showCorners(plane, id);
+        
+
         auto marker = makePlane(plane, id);
         auto int_plane = makeMenuPlane("TaskAction", marker);
         // Add the interactive marker to the server
@@ -319,8 +321,8 @@ public:
         // Vectors
         marker.points.push_back(vector2point(plane.vertex(0)));
         marker.points.push_back(vector2point(plane.vertex(1)));
-        marker.points.push_back(vector2point(plane.vertex(2)));
         marker.points.push_back(vector2point(plane.vertex(3)));
+        marker.points.push_back(vector2point(plane.vertex(2)));
         marker.points.push_back(vector2point(plane.vertex(0)));
         // Color
         marker.color.r = 1.0f;
@@ -484,31 +486,24 @@ private:
     {
         // first entry
         interactions = menu_handler_.insert("Interactions");
-        grind = menu_handler_.insert(interactions, "Grind", std::bind(&RepairInterface::taskGrind, this, _1));
+        grind = menu_handler_.setCheckState(menu_handler_.insert(interactions, "Grind", std::bind(&RepairInterface::taskGrind, this, _1)), Menu::UNCHECKED);
         paint = menu_handler_.insert(interactions, "Paint", std::bind(&RepairInterface::taskPaint, this, _1));
         vacum = menu_handler_.insert(interactions, "Vacum", std::bind(&RepairInterface::taskVacum, this, _1));
 
         //second entry
         clear_selection = menu_handler_.insert("Clear Selection", std::bind(&RepairInterface::taskClearSelection, this, _1));
-        // next steps
-        // Menu::EntryHandle whole_plane = menu_handler_.insert(grind, "whole_plane");
-        // Menu::EntryHandle select_area = menu_handler_.insert(grind, "select_area");
+   
 
-        // second entry
-        // Menu::EntryHandle details = menu_handler_.insert("Details");
 
-        // part of the example code
-        //  entry = menu_handler_.insert(entry, "sub");
-        //  entry = menu_handler_.insert(entry, "menu", [this](const MarkerFeedback::ConstSharedPtr)
-        //                                                                                          {
-        //                                                                                              RCLCPP_INFO(get_logger(), "the menu has been found");
-        //                                                                                          });
         // menu_handler_.setCheckState(menu_handler_.insert("something", std::bind(&TaskAction::enableCallback, this, _1)), Menu::CHECKED);
 
     }
     //First menu entry
+    void stateCallback(const MarkerFeedback::ConstSharedPtr &feedback){
+        handle = feedback -> menu_entry_id;
+        menu_handler_.getCheckState(handle, state);
+    }
     void taskGrind (const MarkerFeedback::ConstSharedPtr &feedback) {
-
         if(feedback -> menu_entry_id == grind) {
             geometry_msgs::msg::PoseArray corners;
             corners.header.frame_id = "base_link";
@@ -562,7 +557,9 @@ private:
     Menu::EntryHandle interactions; // first entry
     Menu::EntryHandle grind, paint, vacum; //possible operations  
     Menu::EntryHandle clear_selection;
-    
+    Menu::EntryHandle handle;
+    Menu::CheckState state;
+
     rclcpp::Publisher<Marker>::SharedPtr renderer_publisher_;
     rclcpp::Publisher<Marker>::SharedPtr selected_area_publisher;
     std::unique_ptr<interactive_markers::InteractiveMarkerServer> selector_server_;
