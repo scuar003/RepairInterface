@@ -75,6 +75,14 @@ public:
         return n;
     }
 
+    Vector projectPointOntoPlane(const Vector& point) const {
+        Vector planePoint = m_corners[0]; // Can use any point on the plane, here using the first corner
+        Vector n = normal(); // Normal of the plane
+        double d = (point - planePoint).dot(n);
+        return point - d * n; // Projection formula
+    }
+
+
     Eigen::Quaterniond quaternion() const {
         Vector n = normal();
         Eigen::Quaterniond q;
@@ -128,7 +136,7 @@ public:
         selector_server_ = std::make_unique<interactive_markers::InteractiveMarkerServer>("selector", shared_from_this());
         startMenu();
         poses_subscriber_ = create_subscription<geometry_msgs::msg::PoseArray>("detected_surfaces", 10, std::bind(&RepairInterface::detectSurfacesCallback, this, std::placeholders::_1));
-        selected_area_subscriber = create_subscription<geometry_msgs::msg::PointStamped>("/clicked_point", 10, std::bind(&RepairInterface::selectedAreaCallback, this, _1));
+        selected_area_subscriber = create_subscription<geometry_msgs::msg::PointStamped>("/clicked_point", 10, std::bind(&RepairInterface::selectionCallback, this, _1));
         renderer_publisher_ = create_publisher<Marker>("visualize_detected_surfaces", 10);
         selected_area_publisher = create_publisher<Marker>("selected_area", 10);
         repair_execute_publisher = create_publisher<geometry_msgs::msg::PoseArray>("repair_area", 10);
@@ -170,6 +178,7 @@ public:
         showSelector(plane, id);
         
     }
+
     void createPlane(const Plane &plane, int id) {
         clearMarkers();
         showCorners(plane, id);
@@ -182,73 +191,6 @@ public:
         menu_handler_.apply(*selector_server_, "TaskAction");
         // Apply changes to the interactive marker server
         selector_server_->applyChanges();
-    }
-    Marker makePlane(const Plane &plane, int id) {
-        Marker marker;
-        marker.type = Marker::TRIANGLE_LIST;
-        marker.header.frame_id = "base_link";
-        marker.header.stamp = rclcpp::Clock().now();
-        marker.action = Marker::ADD;
-        marker.ns = "repair_surfaces";
-        marker.id = id;
-        marker.pose.orientation.w = 1.0f;
-        // Scale
-        marker.scale.x = 1.0f;
-        marker.scale.y = 1.0f;
-        marker.scale.z = 1.0f;
-        // Triangle 1
-        marker.points.push_back(vector2point(plane.vertex(0)));
-        marker.points.push_back(vector2point(plane.vertex(1)));
-        marker.points.push_back(vector2point(plane.vertex(2)));
-        // Triangle 2
-        marker.points.push_back(vector2point(plane.vertex(1)));
-        marker.points.push_back(vector2point(plane.vertex(3)));
-        marker.points.push_back(vector2point(plane.vertex(2)));
-        // Color
-        marker.color.r = 1.0f;
-        marker.color.g = 0.4f;
-        marker.color.b = 0.0f;
-        marker.color.a = 0.7f;
-        return marker;
-    }
-    IntControl makePlaneControl(const Marker &p_)
-    {
-        IntControl planeControl;
-        planeControl.always_visible = true;
-        planeControl.markers.push_back(p_);
-        planeControl.interaction_mode = IntControl::BUTTON;
-
-        return planeControl;
-    }
-    IntMarker makeMenuPlane(const std::string &name, const Marker &p_)
-    {
-        IntMarker plane;
-        plane.header.frame_id = "base_link";
-        plane.name = name;
-        plane.description = "Selected Plane";
-
-        plane.controls.push_back(makePlaneControl(p_));
-
-        // free move
-
-        // rotational controls
-        //  IntControl rControl;
-        //  rControl.orientation_mode = IntControl::VIEW_FACING;
-        //  rControl.interaction_mode = IntControl::ROTATE_AXIS;
-        //  rControl.orientation.w = 1.0;
-        //  rControl.name = "rotate";
-        //  plane.controls.push_back(rControl);
-
-        // IntControl mControl;
-        // mControl.orientation_mode = IntControl::VIEW_FACING;
-        // mControl.interaction_mode = IntControl::MOVE_PLANE;
-        // mControl.independent_marker_orientation = true;
-        // mControl.name = "move";
-        // mControl.markers.push_back(p_);
-        // mControl.always_visible = true;
-        // plane.controls.push_back(mControl);
-
-        return plane;
     }
 
     void showPlane(const Plane &plane, int id) {
@@ -295,9 +237,9 @@ public:
             marker.pose.orientation.w = 1.0;
 
             // Scale represents the size of the sphere
-            marker.scale.x = 0.05f;  // Sphere diameter in meters
-            marker.scale.y = 0.05f;
-            marker.scale.z = 0.05f;
+            marker.scale.x = 0.025f;  // Sphere diameter in meters
+            marker.scale.y = 0.025f;
+            marker.scale.z = 0.025f;
 
             // Color of the sphere
             marker.color.r = 0.0f;
@@ -306,8 +248,79 @@ public:
             marker.color.a = 1.0f;  // Alpha value of 1 means the sphere is not transparent
 
             renderer_publisher_->publish(marker);
+        }   
     }
-}
+ 
+    Marker makePlane(const Plane &plane, int id) {
+        Marker marker;
+        marker.type = Marker::TRIANGLE_LIST;
+        marker.header.frame_id = "base_link";
+        marker.header.stamp = rclcpp::Clock().now();
+        marker.action = Marker::ADD;
+        marker.ns = "repair_surfaces";
+        marker.id = id;
+        marker.pose.orientation.w = 1.0f;
+        // Scale
+        marker.scale.x = 1.0f;
+        marker.scale.y = 1.0f;
+        marker.scale.z = 1.0f;
+        // Triangle 1
+        marker.points.push_back(vector2point(plane.vertex(0)));
+        marker.points.push_back(vector2point(plane.vertex(1)));
+        marker.points.push_back(vector2point(plane.vertex(2)));
+        // Triangle 2
+        marker.points.push_back(vector2point(plane.vertex(1)));
+        marker.points.push_back(vector2point(plane.vertex(3)));
+        marker.points.push_back(vector2point(plane.vertex(2)));
+        // Color
+        marker.color.r = 1.0f;
+        marker.color.g = 0.4f;
+        marker.color.b = 0.0f;
+        marker.color.a = 0.7f;
+        return marker;
+    }
+    
+    IntControl makePlaneControl(const Marker &p_)
+    {
+        IntControl planeControl;
+        planeControl.always_visible = true;
+        planeControl.markers.push_back(p_);
+        planeControl.interaction_mode = IntControl::BUTTON;
+
+        return planeControl;
+    }
+   
+    IntMarker makeMenuPlane(const std::string &name, const Marker &p_)
+    {
+        IntMarker plane;
+        plane.header.frame_id = "base_link";
+        plane.name = name;
+        plane.description = "Selected Plane";
+
+        plane.controls.push_back(makePlaneControl(p_));
+
+        //free move
+
+        //rotational controls
+        //  IntControl rControl;
+        //  rControl.orientation_mode = IntControl::VIEW_FACING;
+        //  rControl.interaction_mode = IntControl::ROTATE_AXIS;
+        //  rControl.orientation.w = 1.0;
+        //  rControl.name = "rotate";
+        //  plane.controls.push_back(rControl);
+
+        // IntControl mControl;
+        // mControl.orientation_mode = IntControl::VIEW_FACING;
+        // mControl.interaction_mode = IntControl::MOVE_PLANE;
+        // mControl.independent_marker_orientation = true;
+        // mControl.name = "move";
+        // mControl.markers.push_back(p_);
+        // mControl.always_visible = true;
+        // plane.controls.push_back(mControl);
+
+        return plane;
+    }
+
     void showEdge(const Plane &plane, int id) {
         Marker marker;
         marker.type = Marker::LINE_STRIP;
@@ -331,6 +344,7 @@ public:
         marker.color.a = 0.5f;
         renderer_publisher_->publish(marker);
     }
+    
     void showSelector(const Plane &plane, int id) {
         // Create an interactive marker
         IntMarker int_marker;
@@ -374,6 +388,7 @@ public:
         // Apply changes to the interactive marker server
         selector_server_->applyChanges();
     }
+   
     void processFeedback(const MarkerFeedback::ConstSharedPtr &feedback) {
         if (feedback->event_type == MarkerFeedback::BUTTON_CLICK) {
             std::cout << "Button for surface " << feedback->marker_name << " pressed." << std::endl;
@@ -390,15 +405,11 @@ public:
             }
 
             // Clear all visualization markers except those related to the selected sphere/plane
-            selectedPlane(selected_id);
+
+            clearMarkers();
+            createPlane(m_planes[selected_id], selected_id);
 
         }
-    }
-
-    void selectedPlane(int selected_id) {
-        // Now creates the marker related to the selected plane
-        clearMarkers();
-        createPlane(m_planes[selected_id], selected_id);
     }
 
     void showPath(const std::vector<Vector> &path, int id)
@@ -424,7 +435,7 @@ public:
     }
 
 private:
-    void selectedAreaCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg)
+    void selectionCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg)
     {
         // Collect points until we have four
         if (repair_area.size() < 4)
@@ -433,13 +444,10 @@ private:
             RCLCPP_INFO(this->get_logger(), "Point collected: (%.2f, %.2f, %.2f)", msg->point.x, msg->point.y, msg->point.z);
         }
 
-        // When four points are collected, draw the line strip and then clear the points for a new area
-        if (repair_area.size() == 4)
-        {
-            repairArea();
-            repair_area.clear(); // Ready to collect new points for another area
-        }
+        
+        
     }
+   
     void repairArea()
     {
         // Check if we have exactly four points
@@ -459,7 +467,7 @@ private:
         line_strip.action = Marker::ADD;
 
         // LINE_STRIP markers use only the x component of scale, for the line width
-        line_strip.scale.x = 0.01; // Specify a suitable line width
+        line_strip.scale.x = 0.005; // Specify a suitable line width
 
         // Set the color of the line strip
         line_strip.color.r = 1.0f;
@@ -486,13 +494,23 @@ private:
     {
         // first entry
         interactions = menu_handler_.insert("Interactions");
-        grind = menu_handler_.setCheckState(menu_handler_.insert(interactions, "Grind", std::bind(&RepairInterface::taskGrind, this, _1)), Menu::UNCHECKED);
-        paint = menu_handler_.insert(interactions, "Paint", std::bind(&RepairInterface::taskPaint, this, _1));
+        // grind = menu_handler_.setCheckState(menu_handler_.insert(interactions, "Grind", std::bind(&RepairInterface::stateCallback, this, _1)), Menu::UNCHECKED);
+        // paint = menu_handler_.setCheckState(menu_handler_.insert(interactions, "Paint", std::bind(&RepairInterface::stateCallback, this, _1)), Menu::UNCHECKED);
+
+        grind = menu_handler_.insert(interactions, "grind", std::bind(&RepairInterface::stateCallback, this, _1));
+        menu_handler_.setCheckState(grind, Menu::UNCHECKED);
+        paint = menu_handler_.insert(interactions, "paint", std::bind(&RepairInterface::stateCallback, this, _1));
+        menu_handler_.setCheckState(paint, Menu::UNCHECKED);
         vacum = menu_handler_.insert(interactions, "Vacum", std::bind(&RepairInterface::taskVacum, this, _1));
 
+        auto op_names = {"Grind", "Paint", "Vacuum"};
         //second entry
         clear_selection = menu_handler_.insert("Clear Selection", std::bind(&RepairInterface::taskClearSelection, this, _1));
-   
+        
+        // for (auto op : op_names){
+        //     menu_operation_handler = menu_handler_.insert(interactions, op, std::bind(&RepairInterface::stateCallback, this, _1));
+        //     menu_handler_.setCheckState(menu_operation_handler, Menu::UNCHECKED);
+        // }
 
 
         // menu_handler_.setCheckState(menu_handler_.insert("something", std::bind(&TaskAction::enableCallback, this, _1)), Menu::CHECKED);
@@ -501,30 +519,60 @@ private:
     //First menu entry
     void stateCallback(const MarkerFeedback::ConstSharedPtr &feedback){
         handle = feedback -> menu_entry_id;
-        menu_handler_.getCheckState(handle, state);
-    }
-    void taskGrind (const MarkerFeedback::ConstSharedPtr &feedback) {
-        if(feedback -> menu_entry_id == grind) {
-            geometry_msgs::msg::PoseArray corners;
-            corners.header.frame_id = "base_link";
-            corners.header.stamp = get_clock() -> now();
-            for (const auto &point : repair_area_corners){
-                geometry_msgs::msg::Pose pose;
-                pose.position.x = point.x;
-                pose.position.y = point.y;
-                pose.position.z = point.z;
+        if(handle == grind) {
+            menu_handler_.setCheckState(grind, Menu::CHECKED);
+            menu_handler_.setCheckState(paint, Menu::UNCHECKED);
+            menu_handler_.setCheckState(vacum, Menu::UNCHECKED);
 
-                pose.orientation.x = 0.0f;
-                pose.orientation.y = 0.0f;
-                pose.orientation.z = 0.0f;
-                pose.orientation.w = 1.0f;
-
-                corners.poses.push_back(pose);
-            }
-            std::cout << "Publishing corners!" << std::endl; 
-            repair_execute_publisher->publish(corners);
-        
+            taskGrind();
         }
+        if (handle == paint) {
+            menu_handler_.setCheckState(paint, Menu::CHECKED);
+            menu_handler_.setCheckState(grind, Menu::UNCHECKED);
+            menu_handler_.setCheckState(vacum, Menu::UNCHECKED);            
+        }
+        if (handle == vacum) {
+            menu_handler_.setCheckState(vacum, Menu::CHECKED);
+            menu_handler_.setCheckState(paint, Menu::UNCHECKED);
+            menu_handler_.setCheckState(grind, Menu::UNCHECKED);            
+        }
+
+        // menu_handler_.setCheckState(menu_operation_handler, Menu::CHECKED);
+        // menu_operation_handler = handle;
+        // menu_handler_.setCheckState(menu_operation_handler, Menu::UNCHECKED);
+
+
+        menu_handler_.reApply(*selector_server_);
+        selector_server_ -> applyChanges();
+    }
+    void taskGrind () {
+        repair_area.clear(); // Ready to collect new points for another area
+        if (repair_area.size() == 4)
+        {
+            repairArea();
+            repair_area.clear(); // Ready to collect new points for another area
+        }
+        
+        // geometry_msgs::msg::PoseArray corners;
+        // corners.header.frame_id = "base_link";
+        // corners.header.stamp = get_clock() -> now();
+        // for (const auto &point : repair_area_corners){
+        //     geometry_msgs::msg::Pose pose;
+        //     pose.position.x = point.x;
+        //     pose.position.y = point.y;
+        //     pose.position.z = point.z;
+
+        //     pose.orientation.x = 0.0f;
+        //     pose.orientation.y = 0.0f;
+        //     pose.orientation.z = 0.0f;
+        //     pose.orientation.w = 1.0f;
+
+        //     corners.poses.push_back(pose);
+        // }
+        // std::cout << "Publishing corners!" << std::endl; 
+        // repair_execute_publisher->publish(corners);
+        
+        
     }
 
     void taskPaint (const MarkerFeedback::ConstSharedPtr &feedback) {}
@@ -558,7 +606,7 @@ private:
     Menu::EntryHandle grind, paint, vacum; //possible operations  
     Menu::EntryHandle clear_selection;
     Menu::EntryHandle handle;
-    Menu::CheckState state;
+    Menu::EntryHandle menu_operation_handler;
 
     rclcpp::Publisher<Marker>::SharedPtr renderer_publisher_;
     rclcpp::Publisher<Marker>::SharedPtr selected_area_publisher;
