@@ -21,7 +21,7 @@ def generate_launch_description():
         ),
         Node(
             package='demo_py_ready',
-            executable='repair_vacuum',
+            executable='repair_grind',
             output='screen'
         ),
 
