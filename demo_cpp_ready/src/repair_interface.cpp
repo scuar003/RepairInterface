@@ -178,6 +178,8 @@ public:
         
     }
 
+   
+
     void createPlane(const Plane &plane, int id) {
         clearMarkers();
         showCorners(plane, id);
@@ -528,7 +530,9 @@ private:
         if (handle == vacum) {
             menu_handler_.setCheckState(vacum, Menu::CHECKED);
             menu_handler_.setCheckState(expo_marker, Menu::UNCHECKED);
-            menu_handler_.setCheckState(grind, Menu::UNCHECKED);            
+            menu_handler_.setCheckState(grind, Menu::UNCHECKED); 
+            selected_area_subscriber = create_subscription<geometry_msgs::msg::PointStamped>("/clicked_point", 10, std::bind(&RepairInterface::taskVacum, this, _1));
+           
         }
 
         // menu_handler_.setCheckState(menu_operation_handler, Menu::CHECKED);
@@ -539,6 +543,8 @@ private:
         menu_handler_.reApply(*selector_server_);
         selector_server_ -> applyChanges();
     }
+
+
 
    
     void taskGrind (const geometry_msgs::msg::PointStamped::SharedPtr msg) {
@@ -552,31 +558,28 @@ private:
         if (repair_area.size() == 4)
         {
             repairArea();
+            // acceptRepair();
+
             // repair_area.clear();
-        } 
-        //acceptRepair();
+            geometry_msgs::msg::PoseArray corners;
+            corners.header.frame_id = "base_link";
+            corners.header.stamp = get_clock() -> now();
+            for (const auto &point : repair_area_corners){
+                geometry_msgs::msg::Pose pose;
+                pose.position.x = point.x;
+                pose.position.y = point.y;
+                pose.position.z = point.z;
 
-        
-        geometry_msgs::msg::PoseArray corners;
-        corners.header.frame_id = "base_link";
-        corners.header.stamp = get_clock() -> now();
-        for (const auto &point : repair_area_corners){
-            geometry_msgs::msg::Pose pose;
-            pose.position.x = point.x;
-            pose.position.y = point.y;
-            pose.position.z = point.z;
+                pose.orientation.x = 0.0f;
+                pose.orientation.y = 0.0f;
+                pose.orientation.z = 0.0f;
+                pose.orientation.w = 1.0f;
 
-            pose.orientation.x = 0.0f;
-            pose.orientation.y = 0.0f;
-            pose.orientation.z = 0.0f;
-            pose.orientation.w = 1.0f;
-
-            corners.poses.push_back(pose);
-        }
-        std::cout << "Publishing corners!" << std::endl; 
-        repair_execute_publisher->publish(corners);
-        
-        
+                corners.poses.push_back(pose);
+            }
+            std::cout << "Publishing corners!" << std::endl; 
+            repair_execute_publisher->publish(corners);
+            } 
     }
 
     void taskExpoMarker (const geometry_msgs::msg::PointStamped::SharedPtr msg) {
@@ -588,56 +591,81 @@ private:
             repair_area.clear();
         }
 
+        
+
     }
 
-    void taskVacum (const MarkerFeedback::ConstSharedPtr &feedback) {}
+    void taskVacum (const geometry_msgs::msg::PointStamped::SharedPtr msg) {}
 
     // void acceptRepair() {
-    //     // Create an interactive marker
-    //     IntMarker execute;
-    //     execute.header.frame_id = "base_link";
-    //     execute.header.stamp = rclcpp::Clock().now();
-    //     execute.name = "Execute Button ";
-    //     execute.description = "Surface ";
+    //     // Define an interactive marker
+    //     IntMarker execute_marker;
+    //     execute_marker.header.frame_id = "base_link";
+    //     execute_marker.header.stamp = rclcpp::Clock().now();
+    //     execute_marker.name = "Execute_Repair";
+    //     execute_marker.description = "Press to execute repair";
 
-    //     // Set the position of the interactive marker
-        
-    //     execute.pose.position.x = 1.0;
-    //     execute.pose.position.y = 1.0;
-    //     execute.pose.position.z = 1.0;
-    //     execute.scale = 0.1; // Adjust the scale of the interactive marker if necessary
+    //     // Set the position (adjust according to your needs)
+    //     execute_marker.pose.position.x = 0.25; // Example positions
+    //     execute_marker.pose.position.y = 0.25;
+    //     execute_marker.pose.position.z = 0.25;
+    //     execute_marker.scale = 0.1; // Scale of the interactive marker
 
-    //     // Create a sphere control for the interactive marker
+    //     // Create a control that will act as a button
     //     IntControl button_control;
     //     button_control.interaction_mode = IntControl::BUTTON;
-    //     button_control.name = "button_control";
+    //     button_control.name = "button";
 
-    //     // Add a sphere to the button control
+    //     // Create a marker for the button
     //     Marker marker;
-    //     marker.type = Marker::SPHERE;
-    //     marker.scale.x = 0.05f; // Sphere size
-    //     marker.scale.y = 0.05f;
-    //     marker.scale.z = 0.05f;
-    //     marker.color.r = 1.0f;
-    //     marker.color.g = 1.0f;
-    //     marker.color.b = 0.0f;
-    //     marker.color.a = 0.5f;
+    //     marker.type = Marker::CUBE;
+    //     marker.scale.x = 0.05;
+    //     marker.scale.y = 0.05;
+    //     marker.scale.z = 0.05;
+    //     marker.color.r = 0.0;
+    //     marker.color.g = 1.0;
+    //     marker.color.b = 0.0;
+    //     marker.color.a = 1.0;
 
+    //     // Add the marker to the button control
     //     button_control.markers.push_back(marker);
-    //     button_control.always_visible = true; // Make the control always visible
+    //     button_control.always_visible = true;
 
     //     // Add the control to the interactive marker
-    //     execute.controls.push_back(button_control);
-    //     menu_handler_.apply(*selector_server_, "TaskAction");
+    //     execute_marker.controls.push_back(button_control);
 
-    //     // Add the interactive marker to the server
-    //     selector_server_->insert(execute, std::bind(&RepairInterface::, this, std::placeholders::_1));
-    //     // Apply changes to the interactive marker server
+    //     // Insert the interactive marker into the server and apply changes
+    //     std::cout << "The executer button has been Published" << std::endl;
+    //     selector_server_->insert(execute_marker, std::bind(&RepairInterface::executeTask, this, std::placeholders::_1));
     //     selector_server_->applyChanges();
-       
+    // }
 
+
+    //  void executeTask(const MarkerFeedback::ConstSharedPtr &feedback) {
+        
+    //     if (feedback -> event_type == MarkerFeedback::BUTTON_CLICK) {
+    //         geometry_msgs::msg::PoseArray corners;
+    //         corners.header.frame_id = "base_link";
+    //         corners.header.stamp = get_clock() -> now();
+    //         for (const auto &point : repair_area_corners){
+    //             geometry_msgs::msg::Pose pose;
+    //             pose.position.x = point.x;
+    //             pose.position.y = point.y;
+    //             pose.position.z = point.z;
+
+    //             pose.orientation.x = 0.0f;
+    //             pose.orientation.y = 0.0f;
+    //             pose.orientation.z = 0.0f;
+    //             pose.orientation.w = 1.0f;
+
+    //             corners.poses.push_back(pose);
+    //         }
+    //         std::cout << "Publishing corners!" << std::endl; 
+    //         repair_execute_publisher->publish(corners);
+    //     }
     //  }
-    
+
+     
     //second menu entry
     void taskClearSelection (const MarkerFeedback::ConstSharedPtr &feedback) {
   
@@ -670,6 +698,7 @@ private:
     rclcpp::Publisher<Marker>::SharedPtr renderer_publisher_;
     rclcpp::Publisher<Marker>::SharedPtr selected_area_publisher;
     std::unique_ptr<interactive_markers::InteractiveMarkerServer> selector_server_;
+
 
     rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr poses_subscriber_;
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr selected_area_subscriber;
