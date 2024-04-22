@@ -177,7 +177,7 @@ class URControlNode(Node):
         self.subscription = self.create_subscription(PoseArray, 'repair_area/grind', self.pose_array_callback, 10)
         self.marker_publisher = self.create_publisher(Marker,'repair_path', 10)
         self.points_list = []
-        self.robot_ip = "172.16.3.114"  # Replace with your robot's IP address
+        self.robot_ip = "172.16.0.9"  # Replace with your robot's IP address
         self.robot = None
 
     def pose_array_callback(self, msg):
@@ -201,7 +201,7 @@ class URControlNode(Node):
         while not connected and tries < maxTries:
             try:
                 time.sleep(0.3)
-                robot = urx.Robot("172.16.3.114")
+                robot = urx.Robot("172.16.0.9")
                 time.sleep(0.3)
                 connected = True
             except:
