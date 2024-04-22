@@ -1,3 +1,4 @@
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseArray
@@ -83,14 +84,6 @@ def offset(corner, offset, normal):
    corner_new = corner - offset*normal
    return corner_new
 
-def generatePath(points, normal):
-    path = []
-    last_point = offset(points[-1], 0.01, normal)
-    for x in points:
-        path.append([x[0], x[1], x[2]])
-    path.append(last_point)
-    return path
-
 def calculate_rotations(path):
     rotations = []
     for counter in range(len(path) - 2):
@@ -101,24 +94,25 @@ def calculate_rotations(path):
     return rotations
 
 # Perform the vacuum task
-def checkSurface(ur_control, acc, vel, normal_vector, points): #, tool, tool_changer
+def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
     home(ur_control.robot, 0.5, 0.5)
     lock = 0
     unlock = 1
     tool_off = 0 
     tool_on = 1
     vacuum_payload = 2.230
-    normal_vector = normalize(np.cross(points[1] - points[0], points[2] - points[0]))
     vacuum_cog = (-0.012, -0.010, 0.098)
     normal_payload = 1.100
     normal_tcp = (0, 0, 0, 0, 0, 0)
-    vacuum_tcp = (-0.05199, 0.19201, 0.22699, 2.4210, -0.0025, 0.0778)
-    # getVacuum(ur_control.robot, tool_changer, unlock, lock, vacuum_payload, vacuum_tcp, vacuum_cog)
-    ur_control.robot.movej((-1.57, -1.57, -1.57, -1.57, 1.57, 3.14), 0.2, 0.2)
-    ur_control.robot.set_payload(vacuum_payload, vacuum_cog)
+    vacuum_tcp = (-0.05199, 0.18001, 0.22699, 2.4210, -0.0025, 0.0778)
+    # getVacuum(robot, tool_changer, unlock, lock, vacuum_payload, vacuum_tcp, vacuum_cog)
+    ur_control.robot.movej((-1.57, -1.57, -1.57, -1.57, 1.57, 3.14), 0.5, 0.5)
+    ur_control.robot.set_payload(vacuum_payload)
     ur_control.robot.set_tcp(vacuum_tcp)
     linearPosition = ur_control.robot.getl()
     linearPosition[1] = -0.400 
+    linearPosition[0] = -0.400
+    ur_control.robot.movel(linearPosition, 0.2, 0.2)
     ur_control.robot.movel(linearPosition[:3]+[0,0,0], 0.2, 0.2)
     orientation = vector_to_euler_angles(normal_vector)
     eax = orientation[0]
@@ -130,36 +124,45 @@ def checkSurface(ur_control, acc, vel, normal_vector, points): #, tool, tool_cha
     o.rotate_zb(eaz)
     ur_control.robot.set_orientation(o)
     linearPosition = ur_control.robot.getl() 
-    orientation = linearPosition[-3:]
-    path = generatePath(points, normal_vector)
+    rx = linearPosition[3]
+    ry = linearPosition[4]
+    rz = linearPosition[5]
+    path = points
+    last_point = offset(points[-1], 0.01, normal_vector)
     # tool.write(tool_on)
     rotations = calculate_rotations(path)
     counter = 0
-    while counter < len(path) - 1:
+    while counter < len(path):
         temp_pos = ur_control.robot.getl()
         if counter == 0:
-            ur_control.robot.movel(path[counter] + temp_pos[-3:], acc, vel)
+            target = path[counter] + temp_pos[-3:]
+            ur_control.robot.movel(target, acc, vel)
             temp_pos = ur_control.robot.getl()
             temp_list = temp_pos[:3]
             temp_v1 = normalize(np.array([0,1,0]))
             temp_v2 = normalize(np.array(temp_list))
             o = ur_control.robot.get_orientation() 
             o.rotate_zb(get_rotation_angle(temp_v1, temp_v2))
-            ur_control.robot.set_orientation(o)
-        elif counter == len(path) - 2:
-            ur_control.robot.movel(path[counter] + temp_pos[-3:], acc, vel)
+            ur_control.robot.set_orientation(o, 0.3, 0.3)
+        elif counter == len(path) - 1:
+            target = path[counter] + temp_pos[-3:]
+            ur_control.robot.movel(target, acc, vel)
         else:
-            ur_control.robot.movel(path[counter] + temp_pos[-3:], acc, vel)
+            target = path[counter] + temp_pos[-3:]
+            ur_control.robot.movel(target, acc, vel)
             o = ur_control.robot.get_orientation() 
-            o.rotate_zb(rotations[counter])
-            ur_control.robot.set_orientation(o)    
+            o.rotate_zb(rotations[counter-1])
+            ur_control.robot.set_orientation(o, 0.3, 0.3)    
         counter = counter + 1    
     temp_pos = ur_control.robot.getl()
-    ur_control.robot.movel(path[-1] + temp_pos[-3:])
+    target = [temp_pos[0], temp_pos[1], temp_pos[2]]
+    last_point = offset(target, 0.05, normal_vector)
+    final_move = (last_point[0], last_point[1], last_point[2], temp_pos[3], temp_pos[4], temp_pos[5])
+    ur_control.robot.movel(final_move, acc, vel)
     # tool.write(tool_off)
     ur_control.robot.set_tcp(normal_tcp)
     home(ur_control.robot, 0.5, 0.5)
-    # returnVacuum(ur_control.robot, tool_changer, unlock, normal_payload, normal_tcp)
+    # returnVacuum(robot, tool_changer, unlock, normal_payload, normal_tcp)
     ur_control.robot.set_payload(normal_payload)
     # Clean
     ur_control.clear_path()
@@ -171,7 +174,7 @@ class URControlNode(Node):
         self.subscription = self.create_subscription(PoseArray, 'repair_area/vacum', self.pose_array_callback, 10)
         self.marker_publisher = self.create_publisher(Marker,'repair_path', 10)
         self.points_list = []
-        self.robot_ip = "172.16.3.114"  # Replace with your robot's IP address
+        self.robot_ip = "172.16.0.9"  # Replace with your robot's IP address
         self.robot = None
 
     def pose_array_callback(self, msg):
@@ -195,7 +198,7 @@ class URControlNode(Node):
         while not connected and tries < maxTries:
             try:
                 time.sleep(0.3)
-                robot = urx.Robot("172.16.3.114")
+                robot = urx.Robot("172.16.0.9")
                 time.sleep(0.3)
                 connected = True
             except:
@@ -205,19 +208,19 @@ class URControlNode(Node):
         if connected:
             points = np.array(self.points_list)
             self.robot = urx.Robot(self.robot_ip)
-            # board = Arduino('/dev/ttyACM0')
-            # tool_relay_pin_number = 7
-            # tool = board.get_pin(f'd:{tool_relay_pin_number}:o')
-            # tool_changer_relay_pin_number = 8
-            # tool_changer = board.get_pin(f'd:{tool_changer_relay_pin_number}:o')
+            board = Arduino('/dev/ttyACM0')
+            tool_relay_pin_number = 7
+            tool = board.get_pin(f'd:{tool_relay_pin_number}:o')
+            tool_changer_relay_pin_number = 8
+            tool_changer = board.get_pin(f'd:{tool_changer_relay_pin_number}:o')
             normal_vector = []
             home(self.robot, 0.8, 0.8)
-            checkSurface(self, 0.3, 0.3, normal_vector, points) #, tool, tool_changer
+            vacuum(self, 0.3, 0.3, normal_vector, points, tool, tool_changer)
             home(self.robot,0.8,0.8)
             self.robot.close()
             self.robot = None
         else:
-            print("mani has the solution up his ass")
+            print("Connection failed. Check robot state.")
 
     def show_path(self, waypoints):
         marker = Marker() 

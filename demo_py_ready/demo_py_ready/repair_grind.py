@@ -85,31 +85,35 @@ def offset(corner, offset, normal):
    return corner_new
 
 def generateWaypoints(grid_size, lift_distance, lower, rx, ry, rz, points):
-   op1, op2, op3, op4 = points
-   normal_vector = normalize(np.cross(op2 - op1, op3 - op1))
-   p1 = offset(op1, lower, normal_vector)
-   p2 = offset(op2, lower, normal_vector)
-   p3 = offset(op3, lower, normal_vector)
-   p4 = offset(op4, lower, normal_vector)
-   normal_vector = normalize(np.cross(p2 - p1, p3 - p1))
-   move_vector = p2 - p1
-   shift_vector = normalize(p4 - p1) * grid_size
-   num_passes = int(np.linalg.norm(p4 - p1) / grid_size) + 1
-   waypoints = []
-   current_position = p1.copy()
-   for pass_num in range(num_passes):
-       move_end = current_position + move_vector
-       waypoints.append((current_position[0], current_position[1], current_position[2], rx, ry, rz))
-       waypoints.append((move_end[0], move_end[1], move_end[2], rx, ry, rz))
-       lifted_position = move_end + lift_distance * normal_vector       
-       waypoints.append((lifted_position[0], lifted_position[1], lifted_position[2], rx, ry, rz))
-       if pass_num < num_passes - 1:
-           next_start_at_lifted_height = current_position + shift_vector + lift_distance * normal_vector
-           waypoints.append((next_start_at_lifted_height[0], next_start_at_lifted_height[1], next_start_at_lifted_height[2], rx, ry, rz))
-           next_start_lowered = next_start_at_lifted_height - lift_distance * normal_vector
-           waypoints.append((next_start_lowered[0], next_start_lowered[1], next_start_lowered[2], rx, ry, rz))
-           current_position = next_start_lowered
-   return waypoints
+    op1, op2, op3, op4 = points
+    normal_vector = normalize(np.cross(op2 - op1, op3 - op1))
+    # Ensure normal vector points upwards; adjust as per your coordinate system
+    if normal_vector[2] < 0:
+        normal_vector = -normal_vector
+    p1 = offset(op1, lower, normal_vector)
+    p2 = offset(op2, lower, normal_vector)
+    p3 = offset(op3, lower, normal_vector)
+    p4 = offset(op4, lower, normal_vector)
+    normal_vector = normalize(np.cross(p2 - p1, p3 - p1))
+    move_vector = p2 - p1
+    shift_vector = normalize(p4 - p1) * grid_size
+    num_passes = int(np.linalg.norm(p4 - p1) / grid_size) + 1
+    waypoints = []
+    current_position = p1.copy()
+    for pass_num in range(num_passes):
+        move_end = current_position + move_vector
+        waypoints.append((current_position[0], current_position[1], current_position[2], rx, ry, rz))
+        waypoints.append((move_end[0], move_end[1], move_end[2], rx, ry, rz))
+        lifted_position = move_end + lift_distance * normal_vector       
+        waypoints.append((lifted_position[0], lifted_position[1], lifted_position[2], rx, ry, rz))
+        if pass_num < num_passes - 1:
+            next_start_at_lifted_height = current_position + shift_vector + lift_distance * normal_vector
+            waypoints.append((next_start_at_lifted_height[0], next_start_at_lifted_height[1], next_start_at_lifted_height[2], rx, ry, rz))
+            next_start_lowered = next_start_at_lifted_height - lift_distance * normal_vector
+            waypoints.append((next_start_lowered[0], next_start_lowered[1], next_start_lowered[2], rx, ry, rz))
+            current_position = next_start_lowered
+    return waypoints
+
 
 # Perform the grinding task
 def grindSurface(ur_control, acc, vel, numPasses, points): #, tool_changer, tool

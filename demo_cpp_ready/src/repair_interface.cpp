@@ -565,10 +565,7 @@ private:
         if (repair_area.size() > 1 ) {
             repairArea();
             acceptRepair();
-            
         }
-
-        
 
     }
 
@@ -577,9 +574,6 @@ private:
         RCLCPP_INFO(this -> get_logger(), "Point collected:(%.2f, %.2f, %.2f)", msg->point.x, msg->point.y, msg->point.z);
         repairArea();
         acceptRepair();
-
-
-
     }
 
     void acceptRepair() {
