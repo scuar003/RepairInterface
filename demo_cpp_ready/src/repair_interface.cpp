@@ -559,12 +559,17 @@ private:
     }
 
     void taskExpoMarker (const geometry_msgs::msg::PointStamped::SharedPtr msg) {
-        repair_area.push_back(msg -> point);
-        RCLCPP_INFO(this->get_logger(), "Point collected: (%.2f, %.2f, %.2f)", msg->point.x, msg->point.y, msg->point.z);
+        if (repair_area.size() < 4)
+        {
+            repair_area.push_back(msg->point);
+            RCLCPP_INFO(this->get_logger(), "Point collected: (%.2f, %.2f, %.2f)", msg->point.x, msg->point.y, msg->point.z);
+        }
         
-        if (repair_area.size() > 1 ) {
+        if (repair_area.size() == 4)
+        {
             repairArea();
             acceptRepair();
+            
         }
 
     }
@@ -572,8 +577,13 @@ private:
     void taskVacum (const geometry_msgs::msg::PointStamped::SharedPtr msg) {
         repair_area.push_back(msg -> point);
         RCLCPP_INFO(this -> get_logger(), "Point collected:(%.2f, %.2f, %.2f)", msg->point.x, msg->point.y, msg->point.z);
-        repairArea();
-        acceptRepair();
+        if (repair_area.size() > 2 ) {
+            repairArea();
+            
+        }
+        if (repair_area.size() >= 3) {
+            acceptRepair();
+        }
     }
 
     void acceptRepair() {

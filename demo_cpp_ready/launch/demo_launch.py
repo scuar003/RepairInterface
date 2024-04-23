@@ -24,8 +24,18 @@ def generate_launch_description():
             executable='repair_grind',
             output='screen'
         ),
+        Node(
+            package='demo_py_ready',
+            executable='repair_vacuum',
+            output='screen'
+        ),
+        Node(
+            package='demo_py_ready',
+            executable='repair_expo_marker',
+            output='screen'
+        ),
 
-        #moves
+        # #moves
         Node(
             package='move_cmd_py',
             executable='MoveHome',

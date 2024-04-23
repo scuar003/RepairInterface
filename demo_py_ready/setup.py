@@ -23,7 +23,7 @@ setup(
             'surface_detection=demo_py_ready.surface_detection:main',
             'repair_grind = demo_py_ready.repair_grind:main',
             'repair_vacuum = demo_py_ready.repair_vacuum:main',
-            'repair_pipe = demo_py_ready.repair_pipe:main',
+            'repair_expo_marker = demo_py_ready.repair_expo_marker:main',
         ],
     },
 )

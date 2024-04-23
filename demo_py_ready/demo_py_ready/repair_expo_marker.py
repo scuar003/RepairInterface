@@ -27,38 +27,37 @@ def home(robot, acc, vel):
     robot.movej(home_position, acc, vel)
 
 # Convert a rotation matrix to a rotation vector
-def getGrinder(robot, tool_changer, unlock, lock, grinder_payload, grinder_tcp, grinder_cog):
+def getMarker(robot, tool_changer, unlock, lock, marker_payload, marker_tcp):
     home(robot, 0.5, 0.5)
     robot.set_tcp((0,0,0,0,0,0))
     tool_changer.write(unlock)
-    robot.movej((deg2rad(55.69), deg2rad(-93.34), deg2rad(-101.52), deg2rad(-75.25), deg2rad(90.34), deg2rad(145.69)), 0.5, 0.5)
-    robot.movel((0.42343, 0.31155, 0.24508, 0, 3.143, 0.000), 0.3, 0.3)
-    robot.movel((0.42343, 0.31155, 0.22222, 0, 3.143, 0.000), 0.1, 0.1)
+    robot.movel((0.26055, -0.03720, 0.48702, 2.204, 2.247, -0.067), 0.3, 0.3)
+    robot.movel((0.26055, -0.03720, 0.28893, 2.204, 2.247, -0.067), 0.3, 0.3)
+    robot.movel((0.26055, -0.03720, 0.23795, 2.204, 2.247, -0.067), 0.05, 0.05)
     time.sleep(0.2)  
     tool_changer.write(lock)
     time.sleep(0.2)
-    robot.set_payload(grinder_payload, grinder_cog)
+    robot.set_payload(marker_payload)
     time.sleep(0.2)
-    robot.movel((0.42343, 0.31155, 0.24508, 0, 3.143, 0.000), 0.2, 0.2)
-    robot.movel((0.42343, 0.31155, 0.45083, 0, 3.143, 0.000), 0.3, 0.3)
+    robot.movel((0.26055, -0.03720, 0.28893, 2.204, 2.247, -0.067), 0.1, 0.1)
+    robot.movel((0.26055, -0.03720, 0.48702, 2.204, 2.247, -0.067), 0.3, 0.3)
     home(robot, 0.5, 0.5)
-    time.sleep(0.2)
-    robot.set_tcp(grinder_tcp)
+    robot.set_tcp(marker_tcp)
     time.sleep(0.2)
     
-def returnGrinder(robot, tool_changer, unlock, normal_payload, normal_tcp):
+def returnMarker(robot, tool_changer, unlock, normal_payload, normal_tcp):
     home(robot, 0.5, 0.5)
     robot.set_tcp(normal_tcp)
-    robot.movej((deg2rad(55.69), deg2rad(-93.34), deg2rad(-101.52), deg2rad(-75.25), deg2rad(90.34), deg2rad(145.69)), 0.5, 0.5)
-    robot.movel((0.42343, 0.31155, 0.24508, 0, 3.143, 0.000), 0.3, 0.3)
-    robot.movel((0.42343, 0.31155, 0.22222, 0, 3.143, 0.000), 0.1, 0.1) 
+    robot.movel((0.26055, -0.03720, 0.48702, 2.204, 2.247, -0.067), 0.3, 0.3)
+    robot.movel((0.26055, -0.03720, 0.28893, 2.204, 2.247, -0.067), 0.3, 0.3)
+    robot.movel((0.26055, -0.03720, 0.23795, 2.204, 2.247, -0.067), 0.05, 0.05) 
     time.sleep(0.2)
     tool_changer.write(unlock)
     time.sleep(0.2)
     robot.set_payload(normal_payload)
     time.sleep(0.2)
-    robot.movel((0.42343, 0.31155, 0.24508, 0, 3.143, 0.000), 0.2, 0.2)
-    robot.movel((0.42343, 0.31155, 0.45083, 0, 3.143, 0.000), 0.3, 0.3)
+    robot.movel((0.26055, -0.03720, 0.28893, 2.204, 2.247, -0.067), 0.1, 0.1)
+    robot.movel((0.26055, -0.03720, 0.48702, 2.204, 2.247, -0.067), 0.3, 0.3)
     home(robot, 0.5, 0.5)
 
 # Calculate the orientation for grinding based on the points
@@ -124,17 +123,16 @@ def grindSurface(ur_control, acc, vel, numPasses, points, tool_changer, tool): #
     unlock = 1
     tool_off = 0 
     tool_on = 1
-    grinder_payload = 2.200
-    grinder_cog = (-0.008, -0.02, 0.062)
+    marker_payload = 1.200
     normal_payload = 1.100
     normal_tcp = (0, 0, 0, 0, 0, 0)
-    grinder_tcp = (0.00344, 0.13178, 0.25004, 0.0001, 3.0982, 0.4994)
+    marker_tcp = (0, 0, 0.22563, 0.0017, 3.1368, -0.0013)
     waypoints = []
     gridSize = 0.01
     liftDistance = 0.01
-    getGrinder(ur_control.robot, tool_changer, unlock, lock, grinder_payload, grinder_tcp, grinder_cog)
-    ur_control.robot.set_payload(grinder_payload, grinder_cog)
-    ur_control.robot.set_tcp(grinder_tcp)
+    getMarker(ur_control.robot, tool_changer, unlock, lock, marker_payload, marker_tcp)
+    ur_control.robot.set_payload(marker_payload)
+    ur_control.robot.set_tcp(marker_tcp)
     linearPosition = ur_control.robot.getl()
     ur_control.robot.movel(linearPosition[:3]+[0,0,0], 0.2, 0.2)
     joints = ur_control.robot.getj()
@@ -142,8 +140,6 @@ def grindSurface(ur_control, acc, vel, numPasses, points, tool_changer, tool): #
     normal_vector = normalize(np.cross(points[1] - points[0], points[2] - points[0]))
     if normal_vector[2] < 0:
         normal_vector = -normal_vector
-    ur_control.robot.set_payload(grinder_payload, grinder_cog)
-    ur_control.robot.set_tcp(grinder_tcp)
     orientation = vector_to_euler_angles(normal_vector)
     eax = orientation[0]
     eay = orientation[1]
@@ -161,7 +157,7 @@ def grindSurface(ur_control, acc, vel, numPasses, points, tool_changer, tool): #
     PASSES = 1
     count = 0
     lowerDistance = 0.005
-    tool.write(tool_on)
+    # tool.write(tool_on)
     while count <= numPasses - 1:
         if count == 0:
             waypoints = generateWaypoints(gridSize, liftDistance, 0 * count, rx, ry, rz, points)
@@ -177,7 +173,7 @@ def grindSurface(ur_control, acc, vel, numPasses, points, tool_changer, tool): #
         count = count + 1
         print("We are on counter: ", count)
     tool.write(tool_off)
-    returnGrinder(ur_control.robot, tool_changer, unlock, normal_payload, normal_tcp)
+    returnMarker(ur_control.robot, tool_changer, unlock, normal_payload, normal_tcp)
     time.sleep(0.2)
     ur_control.robot.set_payload(normal_payload)
     time.sleep(0.1)
@@ -189,7 +185,7 @@ def grindSurface(ur_control, acc, vel, numPasses, points, tool_changer, tool): #
 class URControlNode(Node):
     def __init__(self):
         super().__init__('ur_control_node')
-        self.subscription = self.create_subscription(PoseArray, 'repair_area/grind', self.pose_array_callback, 10)
+        self.subscription = self.create_subscription(PoseArray, 'repair_area/expo_marker', self.pose_array_callback, 10)
         self.marker_publisher = self.create_publisher(Marker,'repair_path', 10)
         self.points_list = []
         self.robot_ip = "172.16.0.4"  # Replace with your robot's IP address

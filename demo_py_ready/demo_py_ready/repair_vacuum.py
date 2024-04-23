@@ -1,4 +1,3 @@
-
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseArray
@@ -47,38 +46,42 @@ def vector_to_euler_angles(target_normal):
    return roll, pitch, yaw
 
 def getVacuum(robot, tool_changer, unlock, lock, vacuum_payload, vacuum_tcp, vacuum_cog):
-    home(robot)
+    home(robot, 0.5, 0.5)
     robot.set_tcp((0,0,0,0,0,0))
     tool_changer.write(unlock)
-    robot.movel((0.25525, -0.69405, 0.29491, 0, 3.141, -0.007), 0.7, 0.7)
-    robot.movel((0.25525, -0.69407, 0.07763, 0, 3.141, -0.007), 0.7, 0.7)
-    robot.movel((0.25521, -0.69403, 0.00607, 0.001, 3.141, -0.006), 0.1, 0.1)
+    robot.movel((0.42244, 0.09685, 0.43866, 0, 3.143, -0.000), 0.3, 0.3)
+    robot.movel((0.42244, 0.09684, 0.28188, 0, 3.143, -0.000), 0.3, 0.3)
+    robot.movel((0.42243, 0.09688, 0.22548, 0, 3.143, -0.000), 0.1, 0.1)
     time.sleep(0.2)  
     tool_changer.write(lock)
     time.sleep(0.2)
     robot.set_payload(vacuum_payload, vacuum_cog)
     time.sleep(0.2)
-    robot.movel((0.25525, -0.69407, 0.07763, 0, 3.141, -0.007), 0.2, 0.2)
-    robot.movel((0.25525, -0.69405, 0.29491, 0, 3.141, -0.007), 0.7, 0.7)
-    home(robot)
+    robot.movel((0.42243, 0.09685, 0.27521, 0, 3.143, -0.000), 0.2, 0.2)
+    robot.movel((0.43839, 0.09686, 0.27521, 0, 3.143, -0.000), 0.3, 0.3)
+    robot.movel((0.43839, -0.06370, 0.27521, 0, 3.143, -0.000), 0.3, 0.3)
+    robot.movel((0.43839, -0.06370, 0.48735, 0, 3.143, -0.000), 0.3, 0.3)
+    home(robot, 0.5, 0.5)
     time.sleep(0.2)
     robot.set_tcp(vacuum_tcp)
     time.sleep(0.2)
     
 def returnVacuum(robot, tool_changer, unlock, normal_payload, normal_tcp):
-    home(robot)
+    home(robot, 0.5, 0.5)
     robot.set_tcp(normal_tcp)
-    robot.movel((0.25525, -0.69405, 0.29491, 0, 3.141, -0.007), 0.7, 0.7)
-    robot.movel((0.25525, -0.69407, 0.07763, 0, 3.141, -0.007), 0.7, 0.7)
-    robot.movel((0.25521, -0.69403, 0.00607, 0.001, 3.141, -0.006), 0.1, 0.1) 
+    robot.movel((0.43839, -0.06370, 0.48735, 0, 3.143, -0.000), 0.3, 0.3)
+    robot.movel((0.43839, -0.06370, 0.27521, 0, 3.143, -0.000), 0.3, 0.3)
+    robot.movel((0.43839, 0.09686, 0.27521, 0, 3.143, -0.000), 0.3, 0.3)
+    robot.movel((0.42243, 0.09685, 0.27521, 0, 3.143, -0.000), 0.2, 0.2)
+    robot.movel((0.42243, 0.09688, 0.22548, 0, 3.143, -0.000), 0.1, 0.1)
     time.sleep(0.2)
     tool_changer.write(unlock)
     time.sleep(0.2)
     robot.set_payload(normal_payload)
     time.sleep(0.2)
-    robot.movel((0.25525, -0.69407, 0.07763, 0, 3.141, -0.007), 0.2, 0.2)
-    robot.movel((0.25525, -0.69405, 0.29491, 0, 3.141, -0.007), 0.7, 0.7)
-    home(robot)
+    robot.movel((0.42244, 0.09684, 0.28188, 0, 3.143, -0.000), 0.2, 0.2)
+    robot.movel((0.42244, 0.09685, 0.43866, 0, 3.143, -0.000), 0.3, 0.3)
+    home(robot, 0.5, 0.5)
 
 def offset(corner, offset, normal):
    corner_new = corner - offset*normal
@@ -104,8 +107,8 @@ def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
     vacuum_cog = (-0.012, -0.010, 0.098)
     normal_payload = 1.100
     normal_tcp = (0, 0, 0, 0, 0, 0)
-    vacuum_tcp = (-0.05199, 0.18001, 0.22699, 2.4210, -0.0025, 0.0778)
-    # getVacuum(robot, tool_changer, unlock, lock, vacuum_payload, vacuum_tcp, vacuum_cog)
+    vacuum_tcp = (-0.05199, 0.18001, 0.23199, 2.4210, -0.0025, 0.0778)
+    getVacuum(ur_control.robot, tool_changer, unlock, lock, vacuum_payload, vacuum_tcp, vacuum_cog)
     ur_control.robot.movej((-1.57, -1.57, -1.57, -1.57, 1.57, 3.14), 0.5, 0.5)
     ur_control.robot.set_payload(vacuum_payload)
     ur_control.robot.set_tcp(vacuum_tcp)
@@ -123,20 +126,19 @@ def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
     o.rotate_yb(eay)
     o.rotate_zb(eaz)
     ur_control.robot.set_orientation(o)
-    linearPosition = ur_control.robot.getl() 
-    rx = linearPosition[3]
-    ry = linearPosition[4]
-    rz = linearPosition[5]
     path = points
     last_point = offset(points[-1], 0.01, normal_vector)
-    # tool.write(tool_on)
+    tool.write(tool_on)
     rotations = calculate_rotations(path)
+    print('rotations = ', rotations)
     counter = 0
+    print('aproaching surface')
     while counter < len(path):
         temp_pos = ur_control.robot.getl()
         if counter == 0:
             target = path[counter] + temp_pos[-3:]
-            ur_control.robot.movel(target, acc, vel)
+            print(target)
+            #ur_control.robot.movel(target, acc, vel)
             temp_pos = ur_control.robot.getl()
             temp_list = temp_pos[:3]
             temp_v1 = normalize(np.array([0,1,0]))
@@ -146,10 +148,12 @@ def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
             ur_control.robot.set_orientation(o, 0.3, 0.3)
         elif counter == len(path) - 1:
             target = path[counter] + temp_pos[-3:]
-            ur_control.robot.movel(target, acc, vel)
+            print(target)
+            # ur_control.robot.movel(target, acc, vel)
         else:
             target = path[counter] + temp_pos[-3:]
-            ur_control.robot.movel(target, acc, vel)
+            print(target)
+            # ur_control.robot.movel(target, acc, vel)
             o = ur_control.robot.get_orientation() 
             o.rotate_zb(rotations[counter-1])
             ur_control.robot.set_orientation(o, 0.3, 0.3)    
@@ -159,10 +163,10 @@ def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
     last_point = offset(target, 0.05, normal_vector)
     final_move = (last_point[0], last_point[1], last_point[2], temp_pos[3], temp_pos[4], temp_pos[5])
     ur_control.robot.movel(final_move, acc, vel)
-    # tool.write(tool_off)
+    tool.write(tool_off)
     ur_control.robot.set_tcp(normal_tcp)
     home(ur_control.robot, 0.5, 0.5)
-    # returnVacuum(robot, tool_changer, unlock, normal_payload, normal_tcp)
+    returnVacuum(ur_control.robot, tool_changer, unlock, normal_payload, normal_tcp)
     ur_control.robot.set_payload(normal_payload)
     # Clean
     ur_control.clear_path()
@@ -174,7 +178,7 @@ class URControlNode(Node):
         self.subscription = self.create_subscription(PoseArray, 'repair_area/vacum', self.pose_array_callback, 10)
         self.marker_publisher = self.create_publisher(Marker,'repair_path', 10)
         self.points_list = []
-        self.robot_ip = "172.16.0.9"  # Replace with your robot's IP address
+        self.robot_ip = "172.16.0.4"  # Replace with your robot's IP address
         self.robot = None
 
     def pose_array_callback(self, msg):
@@ -182,14 +186,13 @@ class URControlNode(Node):
         self.clear_path()
         self.points_list.clear()
         for pose in msg.poses:
-            processed_point = np.array([-round(pose.position.x , 2 ), 
-                                        -round(pose.position.y , 2 ), 
-                                         round(pose.position.z , 2 )])
+            processed_point = [-round(pose.position.x , 2 ), 
+                               -round(pose.position.y , 2 ), 
+                               round(pose.position.z , 2 )]
             self.points_list.append(processed_point)
         # Make sure there are four corners
-        if len(self.points_list) >= 4:
-            self.points_list = self.points_list[-4:]
-            self.control_ur_robot()
+        print('Connecting to UR...')
+        self.control_ur_robot()
 
     def control_ur_robot(self):
         connected = False
@@ -198,27 +201,35 @@ class URControlNode(Node):
         while not connected and tries < maxTries:
             try:
                 time.sleep(0.3)
-                robot = urx.Robot("172.16.0.9")
+                robot = urx.Robot("172.16.0.4")
                 time.sleep(0.3)
                 connected = True
+                print("connected")
             except:
                 tries += 1
                 print(f"Connection attempt {tries} failed.")
                 time.sleep(1)  # Wait for a second before next attempt
         if connected:
-            points = np.array(self.points_list)
-            self.robot = urx.Robot(self.robot_ip)
-            board = Arduino('/dev/ttyACM0')
-            tool_relay_pin_number = 7
-            tool = board.get_pin(f'd:{tool_relay_pin_number}:o')
-            tool_changer_relay_pin_number = 8
-            tool_changer = board.get_pin(f'd:{tool_changer_relay_pin_number}:o')
-            normal_vector = []
-            home(self.robot, 0.8, 0.8)
-            vacuum(self, 0.3, 0.3, normal_vector, points, tool, tool_changer)
-            home(self.robot,0.8,0.8)
-            self.robot.close()
-            self.robot = None
+            try:
+                points = np.array(self.points_list)
+                self.robot = urx.Robot(self.robot_ip)
+                board = Arduino('/dev/ttyACM1')
+                print('relay connected')
+                tool_relay_pin_number = 7
+                tool = board.get_pin(f'd:{tool_relay_pin_number}:o')
+                tool_changer_relay_pin_number = 8
+                tool_changer = board.get_pin(f'd:{tool_changer_relay_pin_number}:o')
+                normal_vector = normalize(np.cross(points[1] - points[0], points[2] - points[0]))
+                if normal_vector[2] < 0:
+                    normal_vector = -normal_vector
+                print("moving Home..")
+                home(self.robot, 0.8, 0.8)
+                vacuum(self, 0.3, 0.3, normal_vector, points, tool, tool_changer)
+                home(self.robot,0.8,0.8)
+                self.robot.close()
+                self.robot = None
+            except Exception as e:
+                print(f"Exception in control loop: {e}")
         else:
             print("Connection failed. Check robot state.")
 

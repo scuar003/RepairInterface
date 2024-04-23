@@ -112,14 +112,12 @@ def omit_far_points(max_distance, pcd):
     filtered_pcd.points = o3d.utility.Vector3dVector(filtered_points) # add points
     return filtered_pcd
 
-
 class PlaneFinder(Node):
     def __init__(self):
         super().__init__('surface_detection')
-        self.subscription = self.create_subscription(PointCloud2, '/camera/depth/color/points', self.camera_callback, 10)
-        # self.subscription = self.create_subscription(PointCloud2, 'pcl_data', self.camera_callback, 10)
+        self.subscription = self.create_subscription(PointCloud2, '/camera/depth/color/points', self.camera_callback, 1)
         self.publisher_planes = self.create_publisher(PoseArray, 'detected_surfaces', 10)
-        self.command_subscriber = self.create_subscription(String, 'menu_action', self.command_callback, 10)
+        self.command_subscriber = self.create_subscription(String, 'menu_action', self.command_callback, 1)
         # Transofrms
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -127,7 +125,7 @@ class PlaneFinder(Node):
         self.pointcloud_message = None
         
     def command_callback(self, msg):
-        if msg.data == "detect surfaces":
+        if(msg.data == "detect surfaces"):
             print('Decting surfaces...')
             self.detectSurfaces()
             print('... decting surfaces completed!')
@@ -135,25 +133,22 @@ class PlaneFinder(Node):
     def camera_callback(self, msg):
         self.pointcloud_message = msg
 
-    def detectSurfaces(self):
+    def detectSurfaces(self ):
         if self.pointcloud_message == None:
-            print('Ops, no pointclound!')
+            print('Ups, no pointclound!')
             return
         points = msg_to_open3d(self.pointcloud_message)
-        points = omit_far_points(2, points)
+        #points = omit_far_points(2, points)
         points = remove_outliers(points, 100, 1)
         planes = detect_planes(points)
         corners = []
         for plane in planes:
             plane_corners = get_corners_of_plane_of_interest(plane)
-
             for corner in plane_corners:
                 corners.append(corner)
         print('Detected {} surfaces!'.format(len(planes)))
-
         self.publish_corners(corners)
-        
-        
+         
     def publish_corners(self, points):
         target_frame = "base_link"  # Define the target frame
         msg = PoseArray()
