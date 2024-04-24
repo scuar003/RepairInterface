@@ -126,7 +126,7 @@ def grindSurface(ur_control, acc, vel, numPasses, points, tool_changer, tool): #
     marker_payload = 1.200
     normal_payload = 1.100
     normal_tcp = (0, 0, 0, 0, 0, 0)
-    marker_tcp = (0, 0, 0.22563, 0.0017, 3.1368, -0.0013)
+    marker_tcp = (0, 0, 0.23533, 0.0017, 3.1368, -0.0013)
     waypoints = []
     gridSize = 0.01
     liftDistance = 0.01
@@ -173,6 +173,7 @@ def grindSurface(ur_control, acc, vel, numPasses, points, tool_changer, tool): #
         count = count + 1
         print("We are on counter: ", count)
     tool.write(tool_off)
+    home(ur_control.robot, 0.5, 0.5)
     returnMarker(ur_control.robot, tool_changer, unlock, normal_payload, normal_tcp)
     time.sleep(0.2)
     ur_control.robot.set_payload(normal_payload)

@@ -84,7 +84,7 @@ def returnVacuum(robot, tool_changer, unlock, normal_payload, normal_tcp):
     home(robot, 0.5, 0.5)
 
 def offset(corner, offset, normal):
-   corner_new = corner - offset*normal
+   corner_new = corner + offset*normal
    return corner_new
 
 def calculate_rotations(path):
@@ -107,7 +107,7 @@ def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
     vacuum_cog = (-0.012, -0.010, 0.098)
     normal_payload = 1.100
     normal_tcp = (0, 0, 0, 0, 0, 0)
-    vacuum_tcp = (-0.05199, 0.18001, 0.23199, 2.4210, -0.0025, 0.0778)
+    vacuum_tcp = (-0.05199, 0.18001, 0.24999, 2.4210, -0.0025, 0.0778)
     getVacuum(ur_control.robot, tool_changer, unlock, lock, vacuum_payload, vacuum_tcp, vacuum_cog)
     ur_control.robot.movej((-1.57, -1.57, -1.57, -1.57, 1.57, 3.14), 0.5, 0.5)
     ur_control.robot.set_payload(vacuum_payload)
@@ -136,9 +136,10 @@ def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
     while counter < len(path):
         temp_pos = ur_control.robot.getl()
         if counter == 0:
-            target = path[counter] + temp_pos[-3:]
-            print(target)
-            #ur_control.robot.movel(target, acc, vel)
+            target = (path[counter])
+            move = (target[0], target[1], target[2], temp_pos[3], temp_pos[4], temp_pos[5])
+            print(move)
+            ur_control.robot.movel(move, acc, vel)
             temp_pos = ur_control.robot.getl()
             temp_list = temp_pos[:3]
             temp_v1 = normalize(np.array([0,1,0]))
@@ -147,13 +148,15 @@ def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
             o.rotate_zb(get_rotation_angle(temp_v1, temp_v2))
             ur_control.robot.set_orientation(o, 0.3, 0.3)
         elif counter == len(path) - 1:
-            target = path[counter] + temp_pos[-3:]
-            print(target)
-            # ur_control.robot.movel(target, acc, vel)
+            target = (path[counter])
+            move = (target[0], target[1], target[2], temp_pos[3], temp_pos[4], temp_pos[5])
+            print(move)
+            ur_control.robot.movel(move, acc, vel)
         else:
-            target = path[counter] + temp_pos[-3:]
-            print(target)
-            # ur_control.robot.movel(target, acc, vel)
+            target = (path[counter])
+            move = (target[0], target[1], target[2], temp_pos[3], temp_pos[4], temp_pos[5])
+            print(move)
+            ur_control.robot.movel(move, acc, vel)
             o = ur_control.robot.get_orientation() 
             o.rotate_zb(rotations[counter-1])
             ur_control.robot.set_orientation(o, 0.3, 0.3)    
@@ -186,9 +189,9 @@ class URControlNode(Node):
         self.clear_path()
         self.points_list.clear()
         for pose in msg.poses:
-            processed_point = [-round(pose.position.x , 2 ), 
-                               -round(pose.position.y , 2 ), 
-                               round(pose.position.z , 2 )]
+            processed_point = np.array([-round(pose.position.x , 2 ), 
+                                        -round(pose.position.y , 2 ), 
+                                        round(pose.position.z , 2 )])
             self.points_list.append(processed_point)
         # Make sure there are four corners
         print('Connecting to UR...')

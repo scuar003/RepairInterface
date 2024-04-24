@@ -13,7 +13,9 @@ def deg2rad(deg):
 
 def home(robot, acc, vel):
     home_position = (deg2rad(-90), deg2rad(-90), deg2rad(-90), deg2rad(-90), deg2rad(90), deg2rad(0))
+    camera_position =(deg2rad(-90.51), deg2rad(-53.88), deg2rad(-76.40), deg2rad(-95.10), deg2rad(88.94), deg2rad(0))
     robot.movej(home_position, acc, vel)
+    robot.movej(camera_position, acc, vel)
 
 class URMoveHome(Node):
     def __init__(self):
