@@ -20,10 +20,10 @@ def home(robot, acc, vel):
 class URMoveHome(Node):
     def __init__(self):
         super().__init__('move_home_node')
-        self.subscription = self.create_subscription(String, 'menu_action', self.menu_action_callback, 10)
+        self.subscription = self.create_subscription(String, 'menu_action', self.menuActionCallback, 10)
         self.robot_ip = "172.16.0.4"
 
-    def menu_action_callback(self, msg):
+    def menuActionCallback(self, msg):
         if msg.data == "move home":
             print('Moving Home')
             self.moveHome()

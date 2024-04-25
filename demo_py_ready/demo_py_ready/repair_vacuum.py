@@ -216,7 +216,7 @@ class URControlNode(Node):
             try:
                 points = np.array(self.points_list)
                 self.robot = urx.Robot(self.robot_ip)
-                board = Arduino('/dev/ttyACM1')
+                board = Arduino('/dev/ttyACM0')
                 print('relay connected')
                 tool_relay_pin_number = 7
                 tool = board.get_pin(f'd:{tool_relay_pin_number}:o')
