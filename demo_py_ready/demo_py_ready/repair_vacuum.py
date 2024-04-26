@@ -87,14 +87,40 @@ def offset(corner, offset, normal):
    corner_new = corner + offset*normal
    return corner_new
 
-def calculate_rotations(path):
-    rotations = []
-    for counter in range(len(path) - 2):
-        initial_dir_vector =  normalize(np.array(path[counter + 1]) - np.array(path[counter]))
-        final_dir_vector = normalize(np.array(path[counter + 2]) - np.array(path[counter + 1]))
-        angle_of_rotation = get_rotation_angle(initial_dir_vector, final_dir_vector)
-        rotations.append(angle_of_rotation)
-    return rotations
+def rotate(robot, angle):
+    o = robot.get_orientation()
+    o.rotate_zb(angle)
+    robot.set_orientation(o, 0.2, 0.2)
+
+def follow_path(robot, points, acc, vel, normal_vector):
+    p1 = points[0]
+    p2 = points[1]
+    p3 = points[2]
+    p4 = points[3]
+    grid_size = 0.01
+    move_vector = p2 - p1
+    shift_vector = normalize(p4 - p1) * grid_size
+    num_passes = int(np.linalg.norm(p4 - p1) / grid_size) + 1
+    rz_rotation = np.pi
+    current_position = p1.copy()
+    temp_pos = robot.getl()
+    robot.movel((current_position[0], current_position[1], current_position[2], temp_pos[3], temp_pos[4], temp_pos[5]), acc, vel)
+    for pass_num in range(num_passes):
+        move_end = current_position + move_vector
+        # rotate(robot, -rz_rotation)
+        time.sleep(0.2)
+        temp_pos = robot.getl()
+        robot.movel((move_end[0], move_end[1], move_end[2], temp_pos[3], temp_pos[4], temp_pos[5]), acc, vel)
+        if pass_num < num_passes - 1:
+            next_start_shifted = current_position + shift_vector
+            # rotate(robot, rz_rotation)
+            time.sleep(0.2)
+            temp_pos = robot.getl()
+            robot.movel((next_start_shifted[0], next_start_shifted[1], next_start_shifted[2], temp_pos[3], temp_pos[4], temp_pos[5]), acc, vel)
+            current_position = next_start_shifted
+    last_point = offset(move_end, 0.05, normal_vector)
+    final_move = (last_point[0], last_point[1], last_point[2], temp_pos[3], temp_pos[4], temp_pos[5])
+    robot.movel(final_move, acc, vel)
 
 # Perform the vacuum task
 def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
@@ -107,7 +133,7 @@ def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
     vacuum_cog = (-0.012, -0.010, 0.098)
     normal_payload = 1.100
     normal_tcp = (0, 0, 0, 0, 0, 0)
-    vacuum_tcp = (-0.05199, 0.18001, 0.24999, 2.4210, -0.0025, 0.0778)
+    vacuum_tcp = (-0.05199, 0.18001, 0.22699, 2.4210, -0.0025, 0.0778)
     getVacuum(ur_control.robot, tool_changer, unlock, lock, vacuum_payload, vacuum_tcp, vacuum_cog)
     ur_control.robot.movej((-1.57, -1.57, -1.57, -1.57, 1.57, 3.14), 0.5, 0.5)
     ur_control.robot.set_payload(vacuum_payload)
@@ -117,6 +143,9 @@ def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
     linearPosition[0] = -0.400
     ur_control.robot.movel(linearPosition, 0.2, 0.2)
     ur_control.robot.movel(linearPosition[:3]+[0,0,0], 0.2, 0.2)
+    normal_vector = normalize(np.cross(points[1] - points[0], points[2] - points[0]))
+    if normal_vector[2] < 0:
+        normal_vector = -normal_vector
     orientation = vector_to_euler_angles(normal_vector)
     eax = orientation[0]
     eay = orientation[1]
@@ -126,46 +155,9 @@ def vacuum(ur_control, acc, vel, normal_vector, points, tool, tool_changer):
     o.rotate_yb(eay)
     o.rotate_zb(eaz)
     ur_control.robot.set_orientation(o)
-    path = points
-    last_point = offset(points[-1], 0.01, normal_vector)
+    time.sleep(0.2)
     tool.write(tool_on)
-    rotations = calculate_rotations(path)
-    print('rotations = ', rotations)
-    counter = 0
-    print('aproaching surface')
-    while counter < len(path):
-        temp_pos = ur_control.robot.getl()
-        if counter == 0:
-            target = (path[counter])
-            move = (target[0], target[1], target[2], temp_pos[3], temp_pos[4], temp_pos[5])
-            print(move)
-            ur_control.robot.movel(move, acc, vel)
-            temp_pos = ur_control.robot.getl()
-            temp_list = temp_pos[:3]
-            temp_v1 = normalize(np.array([0,1,0]))
-            temp_v2 = normalize(np.array(temp_list))
-            o = ur_control.robot.get_orientation() 
-            o.rotate_zb(get_rotation_angle(temp_v1, temp_v2))
-            ur_control.robot.set_orientation(o, 0.3, 0.3)
-        elif counter == len(path) - 1:
-            target = (path[counter])
-            move = (target[0], target[1], target[2], temp_pos[3], temp_pos[4], temp_pos[5])
-            print(move)
-            ur_control.robot.movel(move, acc, vel)
-        else:
-            target = (path[counter])
-            move = (target[0], target[1], target[2], temp_pos[3], temp_pos[4], temp_pos[5])
-            print(move)
-            ur_control.robot.movel(move, acc, vel)
-            o = ur_control.robot.get_orientation() 
-            o.rotate_zb(rotations[counter-1])
-            ur_control.robot.set_orientation(o, 0.3, 0.3)    
-        counter = counter + 1    
-    temp_pos = ur_control.robot.getl()
-    target = [temp_pos[0], temp_pos[1], temp_pos[2]]
-    last_point = offset(target, 0.05, normal_vector)
-    final_move = (last_point[0], last_point[1], last_point[2], temp_pos[3], temp_pos[4], temp_pos[5])
-    ur_control.robot.movel(final_move, acc, vel)
+    follow_path(ur_control.robot, points, acc, vel, normal_vector)
     tool.write(tool_off)
     ur_control.robot.set_tcp(normal_tcp)
     home(ur_control.robot, 0.5, 0.5)
@@ -191,11 +183,12 @@ class URControlNode(Node):
         for pose in msg.poses:
             processed_point = np.array([-round(pose.position.x , 2 ), 
                                         -round(pose.position.y , 2 ), 
-                                        round(pose.position.z , 2 )])
+                                         round(pose.position.z , 2 )])
             self.points_list.append(processed_point)
         # Make sure there are four corners
-        print('Connecting to UR...')
-        self.control_ur_robot()
+        if len(self.points_list) >= 4:
+            self.points_list = self.points_list[-4:]
+            self.control_ur_robot()
 
     def control_ur_robot(self):
         connected = False
@@ -204,35 +197,27 @@ class URControlNode(Node):
         while not connected and tries < maxTries:
             try:
                 time.sleep(0.3)
-                robot = urx.Robot("172.16.0.4")
+                robot = urx.Robot(self.robot_ip)
                 time.sleep(0.3)
                 connected = True
-                print("connected")
             except:
                 tries += 1
                 print(f"Connection attempt {tries} failed.")
                 time.sleep(1)  # Wait for a second before next attempt
         if connected:
-            try:
-                points = np.array(self.points_list)
-                self.robot = urx.Robot(self.robot_ip)
-                board = Arduino('/dev/ttyACM0')
-                print('relay connected')
-                tool_relay_pin_number = 7
-                tool = board.get_pin(f'd:{tool_relay_pin_number}:o')
-                tool_changer_relay_pin_number = 8
-                tool_changer = board.get_pin(f'd:{tool_changer_relay_pin_number}:o')
-                normal_vector = normalize(np.cross(points[1] - points[0], points[2] - points[0]))
-                if normal_vector[2] < 0:
-                    normal_vector = -normal_vector
-                print("moving Home..")
-                home(self.robot, 0.8, 0.8)
-                vacuum(self, 0.3, 0.3, normal_vector, points, tool, tool_changer)
-                home(self.robot,0.8,0.8)
-                self.robot.close()
-                self.robot = None
-            except Exception as e:
-                print(f"Exception in control loop: {e}")
+            points = np.array(self.points_list)
+            self.robot = urx.Robot(self.robot_ip)
+            board = Arduino('/dev/ttyACM0')
+            tool_relay_pin_number = 7
+            tool = board.get_pin(f'd:{tool_relay_pin_number}:o')
+            tool_changer_relay_pin_number = 8
+            tool_changer = board.get_pin(f'd:{tool_changer_relay_pin_number}:o')
+            normal_vector = []
+            home(self.robot, 0.8, 0.8)
+            vacuum(self, 0.2, 0.2, normal_vector, points, tool, tool_changer)
+            home(self.robot,0.8,0.8)
+            self.robot.close()
+            self.robot = None
         else:
             print("Connection failed. Check robot state.")
 

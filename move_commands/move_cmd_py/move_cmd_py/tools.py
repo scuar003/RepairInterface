@@ -17,9 +17,20 @@ def home(robot, acc, vel):
     robot.movej(home_position, acc, vel)
 
 #Grinder
-def getGrinder():
-    home(robot, 0.5, 0.5)
+def getGrinder(robot, acc, vel, lock, unlock, tool_changer):
+    pass
+    
+
+def returnGrinder():
+    pass
+
+#Vacuum
+def getVacuum(robot, acc, vel, lock, unlock, tool_changer):
+    home(robot, acc, vel)
     robot.set_tcp((0,0,0,0,0,0))
+    vacuum_tcp =()
+    vacuum_payload = ()
+    vacuum_cog = ()
     tool_changer.write(unlock)
     robot.movel((0.42244, 0.09685, 0.43866, 0, 3.143, -0.000), 0.3, 0.3)
     robot.movel((0.42244, 0.09684, 0.28188, 0, 3.143, -0.000), 0.3, 0.3)
@@ -38,13 +49,6 @@ def getGrinder():
     robot.set_tcp(vacuum_tcp)
     time.sleep(0.2)
 
-def returnGrinder():
-    pass
-
-#Vacuum
-def getVacuum():
-    pass
-
 def returnVacuum():
     pass
 
@@ -55,23 +59,37 @@ def getExpoMarker():
 def returnExpoMarker():
     pass
 
-def getTool(tool, robot):
-    acc, vel = 0.8, 0.8
+def toolChanger():
+    board = Arduino('/dev/ttyACM1')
+    tool_changer_relay_pin_number = 8
+    tool_changer = board.get_pin(f'd:{tool_changer_relay_pin_number}:o')
+    return tool_changer
 
-    if tool.data == "grinder": getGrinder(robot, acc, vel)
-    if tool.data == "vacuum" : getVacuum(robot, acc, vel)
-    if tool.data == "expo_marker" : getExpoMarker(robot, acc, vel)
+def toolActuator():
+    board = Arduino('/dev/ttyACM1')
+    tool_relay_pin_number = 7
+    tool = board.get_pin(f'd:{tool_relay_pin_number}:o')
+    return tool 
 
-def returnTool(tool):
-    if tool == 'grinder': returnGrinder()
-    if tool == 'vacuum': returnVacuum()
-    if tool == 'expo_marker': returnExpoMarker()
+def getTool(msg_tool, robot):
+    acc, vel = 0.5, 0.5
+    lock, unlock = 0, 1
+    tool_changer = toolChanger()
+    if msg_tool.data == "grinder": getGrinder(robot, acc, vel, lock, unlock, tool_changer)
+    if msg_tool.data == "vacuum" : getVacuum(robot, acc, vel)
+    if msg_tool.data == "expo_marker" : getExpoMarker(robot, acc, vel)
+
+def returnTool(current_tool):
+    if current_tool == 'grinder': returnGrinder()
+    if current_tool == 'vacuum': returnVacuum()
+    if current_tool == 'expo_marker': returnExpoMarker()
 
 
 class GetReturnTools(Node):
     def __init__(self):
         super().__init__('Tool Interaction')
         self.subscription = self.create_subscription(String, 'menu_action', self.menuActionCallback, 10)
+        #make current tool a subscriber 
         self.current_tool = ''
         self.robot_ip = '172.16.0.4'
 
@@ -96,7 +114,7 @@ class GetReturnTools(Node):
             self.robot = urx.Robot(self.robot_ip)
             return self.robot
         else:
-            print('Cant connect to the Robot')
+            print("Can't connect to the Robot")
 
 def main(args = None ):
     rclpy.init(args=args)
