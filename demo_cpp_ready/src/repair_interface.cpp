@@ -280,7 +280,7 @@ public:
             update();
         }
     }
-
+   
 
  
     Marker makePlane(const Plane &plane, int id) {
@@ -337,7 +337,7 @@ public:
 
         // Set the orientation to match the plane's normal
         
-
+        int_marker.scale = 0.5;
         int_marker.pose.orientation.w = 1.0;
         int_marker.pose.orientation.x = 0.0;
         int_marker.pose.orientation.y = 1.0;
