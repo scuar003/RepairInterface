@@ -83,7 +83,6 @@ public:
         return point - d * n; // Projection formula
     }
 
-
     Eigen::Quaterniond quaternion() const {
         Vector n = normal();
         Eigen::Quaterniond q;
@@ -102,18 +101,21 @@ public:
     void normalize() {
         Vector c = centroid();
         Vector n = normal();
-        // Calculate perpendicular vectors on the plane
         Vector v = (std::abs(n.z()) < 0.9) ? Vector(0, 0, 1) : Vector(1, 0, 0);
         Vector i = n.cross(v).normalized();
         Vector j = n.cross(i).normalized();
-        // Sides
         double l = length();
         double w = width();
-        // calculate four corners
         m_corners[0] = c + 0.5 * l * i + 0.5 * w * j;
         m_corners[1] = c + 0.5 * l * i - 0.5 * w * j;
         m_corners[2] = c - 0.5 * l * i - 0.5 * w * j;
         m_corners[3] = c - 0.5 * l * i + 0.5 * w * j;
+    }
+
+    void updateCorner(int index, const Vector &new_position) {
+        if (index >= 0 && index < 4) {
+            m_corners[index] = new_position;
+        }
     }
 
     void print() {
@@ -127,6 +129,7 @@ private:
     std::vector<Vector> m_corners;
     Vector m_size;
 };
+
 
 class RepairInterface : public rclcpp::Node {
 public:
@@ -186,16 +189,16 @@ public:
     void createPlane(const Plane &plane, int id) {
         clearMarkers();
         showCorners(plane, id);
-        
 
         auto marker = makePlane(plane, id);
-        auto int_plane = makeMenuPlane("TaskAction", marker);
+        auto int_plane = makeMenuPlane("TaskAction", plane);  // Pass the plane object
         // Add the interactive marker to the server
         selector_server_->insert(int_plane);
         menu_handler_.apply(*selector_server_, "TaskAction");
         // Apply changes to the interactive marker server
         selector_server_->applyChanges();
     }
+
 
     void showPlane(const Plane &plane, int id) {
         Marker marker;
@@ -228,32 +231,57 @@ public:
 
     void showCorners(const Plane &plane, int id) {
         for (int i = 0; i < 4; ++i) {  // Assuming each plane has 4 corners
+            IntMarker int_marker;
+            int_marker.header.frame_id = "base_link";
+            int_marker.header.stamp = rclcpp::Clock().now();
+            int_marker.name = "corner_" + std::to_string(id) + "_" + std::to_string(i);
+            int_marker.description = "Corner " + std::to_string(i);
+
+            int_marker.pose.position = vector2point(plane.vertex(i));
+            int_marker.scale = 0.05; // Adjust the scale of the interactive marker if necessary
+
+            IntControl move_control;
+            move_control.interaction_mode = IntControl::MOVE_PLANE;
+            move_control.orientation.w = 1;
+            move_control.orientation.x = 0;
+            move_control.orientation.y = 1;
+            move_control.orientation.z = 0;
+            
+            move_control.always_visible = true;
+
             Marker marker;
             marker.type = Marker::SPHERE;
-            marker.header.frame_id = "base_link";
-            marker.header.stamp = rclcpp::Clock().now();
-            marker.action = Marker::ADD;
-            marker.ns = "repair_corners";  // Different namespace for corners
-            marker.id = id * 10 + i;  // Ensure unique ID for each corner across planes
-            marker.pose.position = vector2point(plane.vertex(i));
-            
-            // Set the orientation of the sphere to identity, as it doesn't matter for spheres
-            marker.pose.orientation.w = 1.0;
-
-            // Scale represents the size of the sphere
-            marker.scale.x = 0.025f;  // Sphere diameter in meters
-            marker.scale.y = 0.025f;
-            marker.scale.z = 0.025f;
-
-            // Color of the sphere
+            marker.scale.x = 0.05f; // Sphere size
+            marker.scale.y = 0.05f;
+            marker.scale.z = 0.05f;
             marker.color.r = 0.0f;
             marker.color.g = 1.0f;
             marker.color.b = 0.0f;
-            marker.color.a = 1.0f;  // Alpha value of 1 means the sphere is not transparent
+            marker.color.a = 1.0f;
 
-            renderer_publisher_->publish(marker);
-        }   
+            move_control.markers.push_back(marker);
+            int_marker.controls.push_back(move_control);
+
+            selector_server_->insert(int_marker, std::bind(&RepairInterface::processCornerFeedback, this, _1));
+            selector_server_->applyChanges();
+        }
     }
+    void processCornerFeedback(const MarkerFeedback::ConstSharedPtr &feedback) {
+        if (feedback->event_type == MarkerFeedback::MOUSE_UP) {
+            std::string marker_name = feedback->marker_name;
+            size_t first_underscore = marker_name.find('_');
+            size_t last_underscore = marker_name.rfind('_');
+            int plane_id = std::stoi(marker_name.substr(first_underscore + 1, last_underscore - first_underscore - 1));
+            int corner_id = std::stoi(marker_name.substr(last_underscore + 1));
+
+            Vector new_position(feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z);
+            m_planes[plane_id].updateCorner(corner_id, new_position);
+            m_planes[plane_id];
+            update();
+        }
+    }
+
+
  
     Marker makePlane(const Plane &plane, int id) {
         Marker marker;
@@ -294,36 +322,43 @@ public:
         return planeControl;
     }
    
-    IntMarker makeMenuPlane(const std::string &name, const Marker &p_)
+    IntMarker makeMenuPlane(const std::string &name, const Plane &plane)
     {
-        IntMarker plane;
-        plane.header.frame_id = "base_link";
-        plane.name = name;
-        plane.description = "Selected Plane";
+        IntMarker int_marker;
+        int_marker.header.frame_id = "base_link";
+        int_marker.name = name;
+        int_marker.description = "Selected Plane";
 
-        plane.controls.push_back(makePlaneControl(p_));
+        // Set the position of the interactive marker to the centroid of the plane
+        auto centroid = plane.centroid();
+        int_marker.pose.position.x = centroid.x();
+        int_marker.pose.position.y = centroid.y();
+        int_marker.pose.position.z = centroid.z();
 
-        //free move
+        // Set the orientation to match the plane's normal
+        
 
-        //rotational controls
-        //  IntControl rControl;
-        //  rControl.orientation_mode = IntControl::VIEW_FACING;
-        //  rControl.interaction_mode = IntControl::ROTATE_AXIS;
-        //  rControl.orientation.w = 1.0;
-        //  rControl.name = "rotate";
-        //  plane.controls.push_back(rControl);
+        int_marker.pose.orientation.w = 1.0;
+        int_marker.pose.orientation.x = 0.0;
+        int_marker.pose.orientation.y = 1.0;
+        int_marker.pose.orientation.z = 0.0;
 
-        // IntControl mControl;
-        // mControl.orientation_mode = IntControl::VIEW_FACING;
-        // mControl.interaction_mode = IntControl::MOVE_PLANE;
-        // mControl.independent_marker_orientation = true;
-        // mControl.name = "move";
-        // mControl.markers.push_back(p_);
-        // mControl.always_visible = true;
-        // plane.controls.push_back(mControl);
+        // Add the plane visualization marker
+        Marker marker = makePlane(plane, 0);  // Assuming 0 as the id for simplicity
+        IntControl plane_control = makePlaneControl(marker);
+        int_marker.controls.push_back(plane_control);
 
-        return plane;
+        // Add rotational control around the plane's normal axis
+        IntControl r_control;
+        r_control.orientation_mode = IntControl::FIXED;
+        r_control.interaction_mode = IntControl::ROTATE_AXIS;
+        r_control.orientation = int_marker.pose.orientation;  // Align the rotational control with the plane's orientation
+        r_control.name = "rotate";
+        int_marker.controls.push_back(r_control);
+
+        return int_marker;
     }
+
 
     void showEdge(const Plane &plane, int id) {
         Marker marker;
