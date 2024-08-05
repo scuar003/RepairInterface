@@ -13,17 +13,17 @@ def generate_launch_description():
             executable='repair_interface',
             output='screen'
         ),
-        Node(
-            package='demo_cpp_ready',
-            executable='surface_detection',
-            output='screen'
-        ),
-        
         # Node(
-        #     package='demo_py_ready',
+        #     package='demo_cpp_ready',
         #     executable='surface_detection',
         #     output='screen'
         # ),
+        
+        Node(
+            package='demo_py_ready',
+            executable='surface_detection',
+            output='screen'
+        ),
         Node(
             package='demo_py_ready',
             executable='repair_grind',
