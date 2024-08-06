@@ -266,6 +266,14 @@ public:
             selector_server_->applyChanges();
         }
     }
+    void updateSelectedPlane(int plane_id) {
+        // Clear the current markers for the selected plane
+        clearMarkers();
+
+        // Show markers for the selected plane
+        showMarkers(m_planes[plane_id], plane_id);
+    }
+
     void processCornerFeedback(const MarkerFeedback::ConstSharedPtr &feedback) {
         if (feedback->event_type == MarkerFeedback::MOUSE_UP) {
             std::string marker_name = feedback->marker_name;
@@ -276,8 +284,9 @@ public:
 
             Vector new_position(feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z);
             m_planes[plane_id].updateCorner(corner_id, new_position);
-            m_planes[plane_id];
-            update();
+
+            // Update only the selected plane
+            updateSelectedPlane(plane_id);
         }
     }
    
@@ -337,7 +346,7 @@ public:
 
         // Set the orientation to match the plane's normal
         
-        int_marker.scale = 0.5;
+        int_marker.scale = 0.7;
         int_marker.pose.orientation.w = 1.0;
         int_marker.pose.orientation.x = 0.0;
         int_marker.pose.orientation.y = 1.0;
