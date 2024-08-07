@@ -223,7 +223,7 @@ public:
         marker.points.push_back(vector2point(plane.vertex(2)));
         // Color
         marker.color.r = 1.0f;
-        marker.color.g = 0.4f;
+        marker.color.g = 0.0f;
         marker.color.b = 0.0f;
         marker.color.a = 0.25f;
         renderer_publisher_->publish(marker);
@@ -331,8 +331,7 @@ public:
         return planeControl;
     }
    
-    IntMarker makeMenuPlane(const std::string &name, const Plane &plane)
-    {
+    IntMarker makeMenuPlane(const std::string &name, const Plane &plane) {
         IntMarker int_marker;
         int_marker.header.frame_id = "base_link";
         int_marker.name = name;
@@ -345,15 +344,16 @@ public:
         int_marker.pose.position.z = centroid.z();
 
         // Set the orientation to match the plane's normal
-        
-        int_marker.scale = 0.7;
+     
         int_marker.pose.orientation.w = 1.0;
         int_marker.pose.orientation.x = 0.0;
         int_marker.pose.orientation.y = 1.0;
         int_marker.pose.orientation.z = 0.0;
 
+        int_marker.scale = 0.4;
+
         // Add the plane visualization marker
-        Marker marker = makePlane(plane, 0);  // Assuming 0 as the id for simplicity
+        Marker marker = makePlane(plane, 0);
         IntControl plane_control = makePlaneControl(marker);
         int_marker.controls.push_back(plane_control);
 
@@ -361,7 +361,7 @@ public:
         IntControl r_control;
         r_control.orientation_mode = IntControl::FIXED;
         r_control.interaction_mode = IntControl::ROTATE_AXIS;
-        r_control.orientation = int_marker.pose.orientation;  // Align the rotational control with the plane's orientation
+        r_control.orientation = int_marker.pose.orientation;
         r_control.name = "rotate";
         int_marker.controls.push_back(r_control);
 
@@ -436,29 +436,28 @@ public:
         // Apply changes to the interactive marker server
         selector_server_->applyChanges();
     }
+
+
    
-    void processFeedback(const MarkerFeedback::ConstSharedPtr &feedback) {
-        if (feedback->event_type == MarkerFeedback::BUTTON_CLICK) {
-            std::cout << "Button for surface " << feedback->marker_name << " pressed." << std::endl;
-            // Extract the numeric ID from the marker name assuming it follows the "repair_surface_<id>" format
-            std::string selected_id_str = feedback->marker_name.substr(std::string("repair_surface_").length());
-            int selected_id = std::stoi(selected_id_str);
+        void processFeedback(const MarkerFeedback::ConstSharedPtr &feedback) {
+            if (feedback->event_type == MarkerFeedback::BUTTON_CLICK) {
+                std::cout << "Button for surface " << feedback->marker_name << " pressed." << std::endl;
+                std::string selected_id_str = feedback->marker_name.substr(std::string("repair_surface_").length());
+                int selected_id = std::stoi(selected_id_str);
 
-            // Clear all interactive markers except the selected one
-            for (size_t i = 0; i < m_planes.size(); ++i) {
-                std::string marker_name = "repair_surface_" + std::to_string(i);
-                if (i != selected_id) {
-                    selector_server_->erase(marker_name);
+                // Clear all interactive markers except the selected one
+                for (size_t i = 0; i < m_planes.size(); ++i) {
+                    std::string marker_name = "repair_surface_" + std::to_string(i);
+                    if (i != selected_id) {
+                        selector_server_->erase(marker_name);
+                    }
                 }
-            }
 
-            // Clear all visualization markers except those related to the selected sphere/plane
-
-            clearMarkers();
-            createPlane(m_planes[selected_id], selected_id);
-
+                // Clear all visualization markers except those related to the selected sphere/plane
+                clearMarkers();
+                createPlane(m_planes[selected_id], selected_id);
+            } 
         }
-    }
 
     void showPath(const std::vector<Vector> &path, int id)
     {
