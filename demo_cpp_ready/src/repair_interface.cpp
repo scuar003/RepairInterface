@@ -98,26 +98,53 @@ public:
         return (m_corners[2] - m_corners[1]).norm();
     }
 
-    void normalize() {
-        Vector c = centroid();
-        Vector n = normal();
-        Vector v = (std::abs(n.z()) < 0.9) ? Vector(0, 0, 1) : Vector(1, 0, 0);
-        Vector i = n.cross(v).normalized();
-        Vector j = n.cross(i).normalized();
-        double l = length();
-        double w = width();
-        m_corners[0] = c + 0.5 * l * i + 0.5 * w * j;
-        m_corners[1] = c + 0.5 * l * i - 0.5 * w * j;
-        m_corners[2] = c - 0.5 * l * i - 0.5 * w * j;
-        m_corners[3] = c - 0.5 * l * i + 0.5 * w * j;
-    }
+    // void normalize() {
+    //     Vector c = centroid();
+    //     Vector n = normal();
+    //     Vector v = (std::abs(n.z()) < 0.9) ? Vector(0, 0, 1) : Vector(1, 0, 0);
+    //     Vector i = n.cross(v).normalized();
+    //     Vector j = n.cross(i).normalized();
+    //     double l = length();
+    //     double w = width();
+    //     m_corners[0] = c + 0.5 * l * i + 0.5 * w * j;
+    //     m_corners[1] = c + 0.5 * l * i - 0.5 * w * j;
+    //     m_corners[2] = c - 0.5 * l * i - 0.5 * w * j;
+    //     m_corners[3] = c - 0.5 * l * i + 0.5 * w * j;
+    // }
 
     void updateCorner(int index, const Vector &new_position) {
-        if (index >= 0 && index < 4) {
-            m_corners[index] = new_position;
-        }
-    }
+        if (index < 0 || index >= 4) return;
 
+        // Move the selected corner
+        m_corners[index] = new_position;
+
+    //need to find corner that was move
+
+    //use that corner to calculate adj, adj2, diagonal
+
+
+
+
+        // int diagonal, adj1, adj2;
+        // if (index == 0) {
+        //     diagonal = 2;
+        //     adj1 = 1;
+        //     adj2 = 3;
+        // } else if (index == 1) {
+        //     diagonal = 3;
+        //     adj1 = 0;
+        //     adj2 = 2;
+        // } else if (index == 2) {
+        //     diagonal = 0;
+        //     adj1 = 3;
+        //     adj2 = 1;
+        // } else { // index == 3
+        //     diagonal = 1;
+        //     adj1 = 2;
+        //     adj2 = 0;
+        // }
+
+    }
     void print() {
         std::cout << "Plane: {";
         for ( const auto &corner : m_corners)
@@ -184,8 +211,6 @@ public:
         
     }
 
-   
-
     void createPlane(const Plane &plane, int id) {
         clearMarkers();
         showCorners(plane, id);
@@ -251,11 +276,11 @@ public:
 
             Marker marker;
             marker.type = Marker::SPHERE;
-            marker.scale.x = 0.05f; // Sphere size
-            marker.scale.y = 0.05f;
+            marker.scale.x = 0.025f; // Sphere size
+            marker.scale.y = 0.025f;
             marker.scale.z = 0.05f;
-            marker.color.r = 0.0f;
-            marker.color.g = 1.0f;
+            marker.color.r = 1.0f;
+            marker.color.g = 0.0f;
             marker.color.b = 0.0f;
             marker.color.a = 1.0f;
 

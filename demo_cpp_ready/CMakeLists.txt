@@ -21,6 +21,9 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(PCL REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(Eigen3 REQUIRED)
+
+find_package(tf2_eigen REQUIRED)
+
 include_directories(${EIGEN3_INCLUDE_DIR} ${PCL_INCLUDE_DIRS})
 
 add_executable(main_menu src/main_menu.cpp)
@@ -36,7 +39,7 @@ target_link_libraries(surface_detection
 )
 
 add_executable(repair_interface src/repair_interface.cpp)
-ament_target_dependencies(repair_interface rclcpp visualization_msgs interactive_markers geometry_msgs std_msgs)
+ament_target_dependencies(repair_interface rclcpp visualization_msgs interactive_markers geometry_msgs std_msgs tf2_ros tf2_eigen tf2_geometry_msgs)
 
 # Install executable
 install(TARGETS
