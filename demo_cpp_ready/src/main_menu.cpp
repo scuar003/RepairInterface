@@ -208,8 +208,8 @@ private:
     Menu menu_handler_;
     Menu::EntryHandle menu_repair, detect_surfaces, scan_env, 
                       menu_move, move_home, move_3d_Mouse, move_keyboard,  
-                      menu_tools, grinder, p_grinder, h_grinder, vacuum, gripper, marker;
-    Menu::EntryHandle next_entry;
+                      menu_tools, grinder, p_grinder, h_grinder, vacuum, gripper, marker,
+                      next_entry;
 };
 
 int main(int argc, char **argv)
