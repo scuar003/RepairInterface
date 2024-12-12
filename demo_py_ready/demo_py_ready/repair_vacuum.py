@@ -173,7 +173,7 @@ class URControlNode(Node):
         self.subscription = self.create_subscription(PoseArray, 'repair_area/vacum', self.pose_array_callback, 10)
         self.marker_publisher = self.create_publisher(Marker,'repair_path', 10)
         self.points_list = []
-        self.robot_ip = "172.16.0.4"  # Replace with your robot's IP address
+        self.robot_ip = "172.16.3.131"  # Replace with your robot's IP address
         self.robot = None
 
     def pose_array_callback(self, msg):

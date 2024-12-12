@@ -12,8 +12,7 @@
   <exec_depend>sensor_msgs_py</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
-  <exec_depend>open3d_conversions</exec_depend>
-  <exec_depend>open3d</exec_depend>
+
   <exec_depend>geometry_msgs</exec_depend>
   <depend>tf2_ros</depend>
   <depend>tf2_geometry_msgs</depend>

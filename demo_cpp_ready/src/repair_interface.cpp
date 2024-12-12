@@ -383,12 +383,12 @@ public:
         int_marker.controls.push_back(plane_control);
 
         // Add rotational control around the plane's normal axis
-        IntControl r_control;
-        r_control.orientation_mode = IntControl::FIXED;
-        r_control.interaction_mode = IntControl::ROTATE_AXIS;
-        r_control.orientation = int_marker.pose.orientation;
-        r_control.name = "rotate";
-        int_marker.controls.push_back(r_control);
+        // IntControl r_control;
+        // r_control.orientation_mode = IntControl::FIXED;
+        // r_control.interaction_mode = IntControl::ROTATE_AXIS;
+        // r_control.orientation = int_marker.pose.orientation;
+        // r_control.name = "rotate";
+        // int_marker.controls.push_back(r_control);
 
         return int_marker;
     }

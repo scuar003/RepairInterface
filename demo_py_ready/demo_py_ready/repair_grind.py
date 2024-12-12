@@ -32,15 +32,15 @@ def getGrinder(robot, tool_changer, unlock, lock, grinder_payload, grinder_tcp, 
     robot.set_tcp((0,0,0,0,0,0))
     tool_changer.write(unlock)
     robot.movej((deg2rad(55.69), deg2rad(-93.34), deg2rad(-101.52), deg2rad(-75.25), deg2rad(90.34), deg2rad(145.69)), 0.5, 0.5)
-    robot.movel((0.42343, 0.31155, 0.24508, 0, 3.143, 0.000), 0.3, 0.3)
-    robot.movel((0.42343, 0.31155, 0.22222, 0, 3.143, 0.000), 0.1, 0.1)
+    robot.movel((0.42546, 0.31388, 0.24508, 0, 3.143, 0.000), 0.3, 0.3)
+    robot.movel((0.42546, 0.31388, 0.22222, 0, 3.143, 0.000), 0.1, 0.1)
     time.sleep(0.2)  
     tool_changer.write(lock)
     time.sleep(0.2)
     robot.set_payload(grinder_payload, grinder_cog)
     time.sleep(0.2)
-    robot.movel((0.42343, 0.31155, 0.24508, 0, 3.143, 0.000), 0.2, 0.2)
-    robot.movel((0.42343, 0.31155, 0.45083, 0, 3.143, 0.000), 0.3, 0.3)
+    robot.movel((0.42546, 0.31388, 0.24508, 0, 3.143, 0.000), 0.2, 0.2)
+    robot.movel((0.42546, 0.31388, 0.45083, 0, 3.143, 0.000), 0.3, 0.3)
     home(robot, 0.5, 0.5)
     time.sleep(0.2)
     robot.set_tcp(grinder_tcp)
@@ -50,15 +50,15 @@ def returnGrinder(robot, tool_changer, unlock, normal_payload, normal_tcp):
     home(robot, 0.5, 0.5)
     robot.set_tcp(normal_tcp)
     robot.movej((deg2rad(55.69), deg2rad(-93.34), deg2rad(-101.52), deg2rad(-75.25), deg2rad(90.34), deg2rad(145.69)), 0.5, 0.5)
-    robot.movel((0.42343, 0.31155, 0.24508, 0, 3.143, 0.000), 0.3, 0.3)
-    robot.movel((0.42343, 0.31155, 0.22222, 0, 3.143, 0.000), 0.1, 0.1) 
+    robot.movel((0.42546, 0.31388, 0.24508, 0, 3.143, 0.000), 0.3, 0.3)
+    robot.movel((0.42546, 0.31388, 0.22222, 0, 3.143, 0.000), 0.1, 0.1) 
     time.sleep(0.2)
     tool_changer.write(unlock)
     time.sleep(0.2)
     robot.set_payload(normal_payload)
     time.sleep(0.2)
-    robot.movel((0.42343, 0.31155, 0.24508, 0, 3.143, 0.000), 0.2, 0.2)
-    robot.movel((0.42343, 0.31155, 0.45083, 0, 3.143, 0.000), 0.3, 0.3)
+    robot.movel((0.42546, 0.31388, 0.24508, 0, 3.143, 0.000), 0.2, 0.2)
+    robot.movel((0.42546, 0.31388, 0.45083, 0, 3.143, 0.000), 0.3, 0.3)
     home(robot, 0.5, 0.5)
 
 # Calculate the orientation for grinding based on the points
@@ -192,7 +192,7 @@ class URControlNode(Node):
         self.subscription = self.create_subscription(PoseArray, 'repair_area/grind', self.pose_array_callback, 10)
         self.marker_publisher = self.create_publisher(Marker,'repair_path', 10)
         self.points_list = []
-        self.robot_ip = "172.16.0.4"  # Replace with your robot's IP address
+        self.robot_ip = "172.16.3.131"  # Replace with your robot's IP address
         self.robot = None
 
     def pose_array_callback(self, msg):
@@ -216,7 +216,7 @@ class URControlNode(Node):
         while not connected and tries < maxTries:
             try:
                 time.sleep(0.3)
-                robot = urx.Robot("172.16.0.4")
+                robot = urx.Robot("172.16.3.131")
                 time.sleep(0.3)
                 connected = True
             except:
@@ -227,7 +227,7 @@ class URControlNode(Node):
             try:
                 points = np.array(self.points_list)
                 self.robot = urx.Robot(self.robot_ip)
-                board = Arduino('/dev/ttyACM1')
+                board = Arduino('/dev/ttyACM0')
                 tool_relay_pin_number = 7
                 tool = board.get_pin(f'd:{tool_relay_pin_number}:o')
                 tool_changer_relay_pin_number = 8

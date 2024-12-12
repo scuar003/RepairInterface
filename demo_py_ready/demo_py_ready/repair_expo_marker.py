@@ -126,7 +126,7 @@ def grindSurface(ur_control, acc, vel, numPasses, points, tool_changer, tool): #
     marker_payload = 1.200
     normal_payload = 1.100
     normal_tcp = (0, 0, 0, 0, 0, 0)
-    marker_tcp = (0, 0, 0.23533, 0.0017, 3.1368, -0.0013)
+    marker_tcp = (0, 0, 0.180533, 0.0017, 3.1368, -0.0013)
     waypoints = []
     gridSize = 0.01
     liftDistance = 0.01
@@ -189,7 +189,7 @@ class URControlNode(Node):
         self.subscription = self.create_subscription(PoseArray, 'repair_area/expo_marker', self.pose_array_callback, 10)
         self.marker_publisher = self.create_publisher(Marker,'repair_path', 10)
         self.points_list = []
-        self.robot_ip = "172.16.0.4"  # Replace with your robot's IP address
+        self.robot_ip = "172.16.3.131"  # Replace with your robot's IP address
         self.robot = None
 
     def pose_array_callback(self, msg):
@@ -213,7 +213,7 @@ class URControlNode(Node):
         while not connected and tries < maxTries:
             try:
                 time.sleep(0.3)
-                robot = urx.Robot("172.16.0.4")
+                robot = urx.Robot("172.16.3.131")
                 time.sleep(0.3)
                 connected = True
             except:
@@ -224,7 +224,7 @@ class URControlNode(Node):
             try:
                 points = np.array(self.points_list)
                 self.robot = urx.Robot(self.robot_ip)
-                board = Arduino('/dev/ttyACM1')
+                board = Arduino('/dev/ttyACM0')
                 tool_relay_pin_number = 7
                 tool = board.get_pin(f'd:{tool_relay_pin_number}:o')
                 tool_changer_relay_pin_number = 8

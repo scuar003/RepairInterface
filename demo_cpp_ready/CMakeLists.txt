@@ -15,20 +15,45 @@ find_package(visualization_msgs REQUIRED)
 find_package(interactive_markers REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(ur_rtde REQUIRED)
+
+#UR_RTDE set up
+# Manually specify the paths to ur_rtde
+set(UR_RTDE_DIR "/home/robotics/Projects/lib_/ur_rtde")
+set(UR_RTDE_INCLUDE_DIR "${UR_RTDE_DIR}/include")
+set(UR_RTDE_LIBRARY "${UR_RTDE_DIR}/build/librtde.so")
+
+# Include directories
+include_directories(
+  ${UR_RTDE_INCLUDE_DIR}
+)
+
+# Debugging output to verify paths
+message(STATUS "UR_RTDE_INCLUDE_DIR: ${UR_RTDE_INCLUDE_DIR}")
+message(STATUS "UR_RTDE_LIBRARY: ${UR_RTDE_LIBRARY}")
+
+# Add executables
+add_executable(lidar_scan src/lidar_scan.cpp)
+ament_target_dependencies(lidar_scan rclcpp std_msgs)
+target_link_libraries(lidar_scan ${UR_RTDE_LIBRARY})
 
 
 
+find_package(Eigen3 REQUIRED)
+include_directories(${EIGEN3_INCLUDE_DIR})
 
 add_executable(main_menu src/main_menu.cpp)
 ament_target_dependencies(main_menu rclcpp visualization_msgs interactive_markers geometry_msgs std_msgs)
 
 add_executable(repair_interface src/repair_interface.cpp)
-ament_target_dependencies(repair_interface rclcpp visualization_msgs interactive_markers geometry_msgs std_msgs tf2_ros tf2_eigen tf2_geometry_msgs)
+ament_target_dependencies(repair_interface rclcpp visualization_msgs interactive_markers geometry_msgs std_msgs)
+
 
 # Install executable
 install(TARGETS
   repair_interface  #Interface for visualization and task operation 
   main_menu         # Main menu of all available operations. 
+  lidar_scan
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY 
