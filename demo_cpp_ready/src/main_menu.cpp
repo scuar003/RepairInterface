@@ -53,7 +53,7 @@ private:
         //Actions - Interactions
         menu_repair = menu_handler_.insert("Repair Operations");
         detect_surfaces = menu_handler_.insert(menu_repair, "Detect Surfaces", std::bind(&IntMenu::menuAction, this, _1));
-        scan_env = menu_handler_.insert(menu_repair, "Scan Environment(SOON)", std::bind(&IntMenu::menuAction, this, _1));
+        scan_env = menu_handler_.insert(menu_repair, "Scan Environment", std::bind(&IntMenu::menuAction, this, _1));
 
         //move commands 
         menu_move = menu_handler_.insert("Move");

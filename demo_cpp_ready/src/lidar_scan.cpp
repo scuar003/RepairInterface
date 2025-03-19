@@ -44,7 +44,7 @@ class LidarScan : public rclcpp::Node {
 
 int main (int argc, char ** argv) {
     rclcpp::init(argc, argv);
-    const std::string robot_ip = "172.16.3.131";
+    const std::string robot_ip = "192.168.1.85";
     auto node  = std::make_shared<LidarScan>(robot_ip);
     rclcpp::spin(node);
     rclcpp::shutdown();
