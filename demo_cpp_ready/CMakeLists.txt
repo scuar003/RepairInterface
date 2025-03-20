@@ -19,7 +19,7 @@ find_package(ur_rtde REQUIRED)
 
 #UR_RTDE set up
 # Manually specify the paths to ur_rtde
-set(UR_RTDE_DIR "${WORKSPACE}/libs_/ur_rtde")
+set(UR_RTDE_DIR "$ENV{WORKSPACE}/libs_/ur_rtde")
 set(UR_RTDE_INCLUDE_DIR "${UR_RTDE_DIR}/include")
 set(UR_RTDE_LIBRARY "${UR_RTDE_DIR}/build/librtde.so")
 
