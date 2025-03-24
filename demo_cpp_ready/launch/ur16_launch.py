@@ -1,8 +1,25 @@
+import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
+    ur_robot_driver_share_dir = get_package_share_directory('ur_robot_driver')
+    ur_control_launch_file = os.path.join(ur_robot_driver_share_dir, 'launch', 'ur_control.launch.py')
+
+    # Include the ur_control launch file and pass the required parameters
+    include_ur_control = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(ur_control_launch_file),
+        launch_arguments={
+            'ur_type': 'ur16e',
+            'robot_ip': '192.168.56.101',
+            'launch_rviz': 'true'
+        }.items()
+    )
     return LaunchDescription([
+        include_ur_control,
         Node(
             package='demo_cpp_ready',
             executable='main_menu',
@@ -13,11 +30,11 @@ def generate_launch_description():
             executable='repair_interface',
             output='screen'
         ),
-        # Node(
-        #     package='demo_cpp_ready',
-        #     executable='surface_detection',
-        #     output='screen'
-        # ),
+        Node(
+            package='demo_cpp_ready',
+            executable='lidar_scan',
+            output='screen'
+        ),
         
         Node(
             package='demo_py_ready',
