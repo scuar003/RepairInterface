@@ -18,6 +18,25 @@ def generate_launch_description():
             'launch_rviz': 'true'
         }.items()
     )
+
+        # Static transform publisher for camara_link -> camera_link
+    static_tf_camara = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='static_transform_publisher_camara',
+        output='screen',
+        arguments=['0.042', '0.0', '0.036', '1.570', '3.19', '-0.02', 'camara_link', 'camera_link']
+    )
+
+    # Static transform publisher for tool0 -> lase
+    static_tf_tool0 = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='static_transform_publisher_tool0',
+        output='screen',
+        arguments=['-0.13', '-0.03', '0.04', '0', '1.57', '3.14', 'tool0', 'lase']
+    )
+
     return LaunchDescription([
         include_ur_control,
         Node(
@@ -68,4 +87,6 @@ def generate_launch_description():
             executable='move3Dmouse',
             output='screen'
         ),
+        static_tf_camara,
+        static_tf_tool0
     ])
