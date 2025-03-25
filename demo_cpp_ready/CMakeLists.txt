@@ -19,7 +19,8 @@ find_package(ur_rtde REQUIRED)
 
 #UR_RTDE set up
 # Manually specify the paths to ur_rtde
-set(UR_RTDE_DIR "$ENV{WORKSPACE}/libs_/ur_rtde")
+set(UR_RTDE_DIR "$ENV{WORKSPACE}/libs_/ur_rtde") # for the docker 
+#set(UR_RTDE_DIR "/home/robotics/p_devel/libs_/ur_rtde") #for local 
 set(UR_RTDE_INCLUDE_DIR "${UR_RTDE_DIR}/include")
 set(UR_RTDE_LIBRARY "${UR_RTDE_DIR}/build/librtde.so")
 
@@ -58,6 +59,7 @@ install(TARGETS
 
 install(DIRECTORY 
   launch
+  config
   DESTINATION share/${PROJECT_NAME})
 
 ament_package()
