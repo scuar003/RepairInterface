@@ -87,11 +87,6 @@ def launch_setup(context, *args, **kwargs):
             executable='MoveHome',
             output='screen'
         ),
-        Node(
-            package='move_cmd_cpp',
-            executable='move3Dmouse',
-            output='screen'
-        ),
         # Static transforms.
         Node(
             package='tf2_ros',
