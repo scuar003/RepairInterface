@@ -40,7 +40,7 @@ class LidarScan : public rclcpp::Node {
             if (cmd -> data == "scan env") {
                 std::cout << "scannig area" << std::endl;
                 if(!isLidarActive(shared_from_this(), laser_topic)) {
-                    RCLCPP_WARN(get_logger(), "Laser node is not publishing on /scan. Aborting scan.");
+                    RCLCPP_WARN(get_logger(), "Laser node is not publishing on %s. Aborting scan.", laser_topic.c_str());
                     return;
                 } else {
                     scanEnv();
